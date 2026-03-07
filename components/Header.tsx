@@ -29,6 +29,34 @@ function ratingColor(r: number | null) {
   return "#737373";
 }
 
+function IconSearch() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function IconMenu() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
+function IconClose() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
 export default function Header() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -39,7 +67,6 @@ export default function Header() {
   const pathname = usePathname();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMenuOpen(false);
     setMobileSearch(false);
@@ -103,53 +130,37 @@ export default function Header() {
   );
 
   return (
-    <div style={{ backgroundColor: "#EF4832", borderBottom: "2px solid #D4AF37" }}>
+    <div style={{ backgroundColor: "#EF4832", borderBottom: "2px solid #D4AF37", position: "relative", zIndex: 40 }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
 
         {/* ── Desktop row (md+) ─────────────────────────────────────────── */}
         <div className="hidden md:flex items-center justify-between px-4 py-2" style={{ minHeight: 85 }}>
-          {/* Logo */}
           <Link href="/" className="flex-shrink-0">
-            <Image
-              src="/logo.png"
-              alt="Dishoom"
-              width={200}
-              height={52}
-              style={{ maxHeight: 60, width: "auto" }}
-              priority
-            />
+            <Image src="/logo.png" alt="Dishoom" width={200} height={52}
+                   style={{ maxHeight: 60, width: "auto" }} priority />
           </Link>
 
-          {/* Nav + Search */}
           <nav className="flex items-center gap-6">
             {NAV_LINKS.map(({ href, label }) => {
               const isActive = pathname === href || pathname.startsWith(href + "/");
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  className="text-white uppercase text-sm font-medium transition-colors"
-                  style={{
-                    color: isActive ? "#FFF826" : "white",
-                    borderBottom: isActive ? "2px solid #FFF826" : "2px solid transparent",
-                    paddingBottom: 2,
-                  }}
-                >
+                <Link key={href} href={href}
+                      className="text-white uppercase text-sm font-medium transition-colors"
+                      style={{
+                        color: isActive ? "#FFF826" : "white",
+                        borderBottom: isActive ? "2px solid #FFF826" : "2px solid transparent",
+                        paddingBottom: 2,
+                      }}>
                   {label}
                 </Link>
               );
             })}
 
-            {/* Search */}
             <div className="relative">
-              <input
-                type="text"
-                placeholder="Search films..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
-                className="px-3 py-1.5 text-sm border-2 border-gray-200 rounded bg-white text-gray-700 w-48 focus:outline-none focus:border-dishoom-gold"
-              />
+              <input type="text" placeholder="Search films..." value={query}
+                     onChange={(e) => setQuery(e.target.value)}
+                     onBlur={() => setTimeout(() => setOpen(false), 150)}
+                     className="px-3 py-1.5 text-sm border-2 border-gray-200 rounded bg-white text-gray-700 w-48 focus:outline-none focus:border-dishoom-gold" />
               {searchDropdown}
             </div>
           </nav>
@@ -157,35 +168,23 @@ export default function Header() {
 
         {/* ── Mobile row (<md) ──────────────────────────────────────────── */}
         <div className="flex md:hidden items-center justify-between px-4 py-2" style={{ minHeight: 64 }}>
-          {/* Logo */}
           <Link href="/" className="flex-shrink-0" onClick={() => setMenuOpen(false)}>
-            <Image
-              src="/logo.png"
-              alt="Dishoom"
-              width={160}
-              height={42}
-              style={{ maxHeight: 48, width: "auto" }}
-              priority
-            />
+            <Image src="/logo.png" alt="Dishoom" width={160} height={42}
+                   style={{ maxHeight: 48, width: "auto" }} priority />
           </Link>
 
-          {/* Icon buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              aria-label="Search"
-              onClick={() => { setMobileSearch((v) => !v); setMenuOpen(false); }}
-              className="w-10 h-10 flex items-center justify-center text-white rounded"
-              style={{ fontSize: 20 }}
-            >
-              🔍
+          <div className="flex items-center gap-1">
+            <button aria-label="Search"
+                    onClick={() => { setMobileSearch((v) => !v); setMenuOpen(false); }}
+                    className="w-10 h-10 flex items-center justify-center text-white rounded transition-colors"
+                    style={{ background: mobileSearch ? "rgba(0,0,0,0.2)" : "transparent" }}>
+              <IconSearch />
             </button>
-            <button
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              onClick={() => { setMenuOpen((v) => !v); setMobileSearch(false); }}
-              className="w-10 h-10 flex items-center justify-center text-white rounded"
-              style={{ fontSize: 22 }}
-            >
-              {menuOpen ? "✕" : "☰"}
+            <button aria-label={menuOpen ? "Close menu" : "Open menu"}
+                    onClick={() => { setMenuOpen((v) => !v); setMobileSearch(false); }}
+                    className="w-10 h-10 flex items-center justify-center text-white rounded transition-colors"
+                    style={{ background: menuOpen ? "rgba(0,0,0,0.2)" : "transparent" }}>
+              {menuOpen ? <IconClose /> : <IconMenu />}
             </button>
           </div>
         </div>
@@ -195,15 +194,11 @@ export default function Header() {
       {mobileSearch && (
         <div className="md:hidden px-4 pb-3" style={{ borderTop: "1px solid rgba(255,255,255,0.15)" }}>
           <div className="relative mt-3">
-            <input
-              type="text"
-              placeholder="Search films..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onBlur={() => setTimeout(() => setOpen(false), 150)}
-              autoFocus
-              className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded bg-white text-gray-700 focus:outline-none focus:border-dishoom-gold"
-            />
+            <input type="text" placeholder="Search films..." value={query}
+                   onChange={(e) => setQuery(e.target.value)}
+                   onBlur={() => setTimeout(() => setOpen(false), 150)}
+                   autoFocus
+                   className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded bg-white text-gray-700 focus:outline-none focus:border-dishoom-gold" />
             {searchDropdown}
           </div>
         </div>
@@ -211,26 +206,20 @@ export default function Header() {
 
       {/* ── Mobile dropdown menu ──────────────────────────────────────────── */}
       {menuOpen && (
-        <div
-          className="md:hidden absolute left-0 right-0 z-50"
-          style={{ background: "#1a0a00", borderTop: "2px solid #D4AF37" }}
-        >
+        <div className="md:hidden absolute left-0 right-0"
+             style={{ background: "#1a0a00", borderTop: "2px solid #D4AF37", zIndex: 50 }}>
           {NAV_LINKS.map(({ href, label }) => {
             const isActive = pathname === href || pathname.startsWith(href + "/");
             return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center px-6 text-sm font-semibold uppercase tracking-wide transition-colors"
-                style={{
-                  color: isActive ? "#FFF826" : "rgba(255,255,255,0.9)",
-                  borderBottom: "1px solid rgba(255,255,255,0.08)",
-                  paddingTop: 16,
-                  paddingBottom: 16,
-                  background: isActive ? "rgba(239,72,50,0.12)" : "transparent",
-                }}
-              >
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)}
+                    className="flex items-center px-6 text-sm font-semibold uppercase tracking-wide transition-colors"
+                    style={{
+                      color: isActive ? "#FFF826" : "rgba(255,255,255,0.9)",
+                      borderBottom: "1px solid rgba(255,255,255,0.08)",
+                      paddingTop: 16,
+                      paddingBottom: 16,
+                      background: isActive ? "rgba(239,72,50,0.12)" : "transparent",
+                    }}>
                 {label}
               </Link>
             );

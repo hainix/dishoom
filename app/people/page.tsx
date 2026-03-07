@@ -326,7 +326,6 @@ function CuratedSection({
         <div className="flex items-end justify-between mb-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">{list.emoji}</span>
               <span
                 className="text-xs font-bold uppercase tracking-widest"
                 style={{ color: "#D4AF37" }}
