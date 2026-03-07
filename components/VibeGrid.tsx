@@ -14,18 +14,6 @@ const VIBE_ORDER = [
   "Feel Good",
 ];
 
-const VIBE_EMOJI: Record<string, string> = {
-  "Dishoom Dishoom": "👊",
-  "Cult Classic": "🎬",
-  "100% Masala": "🌶️",
-  "No Brain Required Comedy": "😂",
-  "Love/Romance": "💘",
-  "Angry Young Man": "😤",
-  "Blockbuster": "🏆",
-  "Movies with a Message": "✊",
-  "Candy-Floss/NRI Romance": "🌸",
-  "Feel Good": "🌟",
-};
 
 interface VibeGridProps {
   stats: VibeStat[];
@@ -78,7 +66,6 @@ export default function VibeGrid({ stats }: VibeGridProps) {
               <div className="absolute inset-0 bg-black/50 group-hover:bg-black/30 transition-colors" />
               {/* Content */}
               <div className="relative z-10 flex flex-col items-center justify-center h-full p-3 text-center" style={{ minHeight: 100 }}>
-                <span className="text-2xl mb-1">{VIBE_EMOJI[name] ?? "🎥"}</span>
                 <p className="text-white text-xs font-bold uppercase tracking-wide leading-tight">
                   {name}
                 </p>

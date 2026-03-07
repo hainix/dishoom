@@ -105,12 +105,11 @@ function SideRailCard({ film, tall = false }: { film: Film; tall?: boolean }) {
   );
 }
 
-function RailSection({ icon, label, href, children }: { icon: string; label: string; href?: string; children: ReactNode }) {
+function RailSection({ label, href, children }: { label: string; href?: string; children: ReactNode }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3 pb-2"
            style={{ borderBottom: '1px solid rgba(212,175,55,0.25)' }}>
-        <span>{icon}</span>
         <h3 className="text-xs font-black uppercase tracking-widest" style={{ color: '#D4AF37' }}>{label}</h3>
         {href && (
           <Link href={href} className="ml-auto text-xs hover:underline"
@@ -124,9 +123,9 @@ function RailSection({ icon, label, href, children }: { icon: string; label: str
 
 const CATEGORY_PILLS = [
   { label: '🕺 Dance', value: 'dance' },
-  { label: '💘 Love', value: 'love' },
+  { label: '💘 Love Songs', value: 'love' },
   { label: '🕌 Qawwali', value: 'qawwali' },
-  { label: '💃 Item', value: 'item' },
+  { label: '🔥 Item Numbers', value: 'item' },
 ] as const;
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -199,7 +198,7 @@ export default function HomePage() {
                     More Stories
                   </h2>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {newsGrid.map((article) => (
                     <Link key={article.id} href={`/news/${article.slug}`} className="block group">
                       {article.thumbnail ? (
@@ -242,7 +241,6 @@ export default function HomePage() {
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4 pb-2"
                      style={{ borderBottom: '1px solid rgba(212,175,55,0.2)' }}>
-                  <span>🎵</span>
                   <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: '#D4AF37' }}>
                     Watch Now
                   </h2>
@@ -251,7 +249,7 @@ export default function HomePage() {
                     Browse all →
                   </Link>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {featuredSongs.map((song) => (
                     <VideoPlayer
                       key={song.id}
@@ -275,9 +273,9 @@ export default function HomePage() {
           </div>
 
           {/* RIGHT RAIL */}
-          <aside style={{ flex: '0 0 340px', width: 340 }}>
+          <aside className="w-full lg:w-[340px] lg:flex-none">
             {inTheaters.length > 0 && (
-              <RailSection icon="🎬" label="In Cinemas" href="/films?status=in_theaters">
+              <RailSection label="In Cinemas" href="/films?status=in_theaters">
                 {inTheaters.map((film) => (
                   <SideRailCard key={film.id} film={film} tall />
                 ))}
@@ -285,7 +283,7 @@ export default function HomePage() {
             )}
 
             {streaming.length > 0 && (
-              <RailSection icon="📱" label="Now Streaming" href="/films?status=streaming">
+              <RailSection label="Now Streaming" href="/films?status=streaming">
                 {streaming.map((film) => (
                   <SideRailCard key={film.id} film={film} />
                 ))}
@@ -293,7 +291,7 @@ export default function HomePage() {
             )}
 
             {comingSoon.length > 0 && (
-              <RailSection icon="📅" label="Coming Soon">
+              <RailSection label="Coming Soon">
                 {comingSoon.map((film) => (
                   <SideRailCard key={film.id} film={film} />
                 ))}

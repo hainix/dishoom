@@ -326,7 +326,6 @@ function CuratedSection({
         <div className="flex items-end justify-between mb-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">{list.emoji}</span>
               <span
                 className="text-xs font-bold uppercase tracking-widest"
                 style={{ color: "#D4AF37" }}
@@ -349,7 +348,7 @@ function CuratedSection({
         {/* Portrait grid */}
         <div
           className="grid gap-3"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))" }}
         >
           {people.map((person, i) => (
             <StarCard
@@ -387,7 +386,7 @@ function BrowseGrid({
       >
         {title}
       </h3>
-      <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-10 gap-5">
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-5">
         {people.map((person) => {
           const initials = person.name
             .split(" ")
