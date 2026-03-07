@@ -10,11 +10,13 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@libsql/client": "^0.17.0",
     "@prisma/adapter-libsql": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "better-sqlite3": "^12.6.2",
     "next": "16.1.6",
+    "node-cron": "^4.2.1",
     "prisma": "^7.4.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -24,6 +26,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.19.37",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.3.1",

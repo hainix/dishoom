@@ -10,7 +10,7 @@ let db: Database.Database | null = null;
 
 export function getDb(): Database.Database {
   if (!db) {
-    const dbPath = path.resolve(process.cwd(), "prisma/dev.db");
+    const dbPath = process.env.DB_PATH || path.resolve(process.cwd(), "prisma/dev.db");
     db = new Database(dbPath);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
