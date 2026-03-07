@@ -37,6 +37,34 @@ function formatDate(dateStr: string) {
   }
 }
 
+export async function generateMetadata({ params }: NewsArticlePageProps) {
+  const { slug } = await params;
+  const article = getArticleBySlug(slug);
+  if (!article) return {};
+
+  const description = article.description?.slice(0, 155) ?? article.title;
+
+  return {
+    title: article.title,
+    description,
+    openGraph: {
+      title: article.title,
+      description,
+      type: "article" as const,
+      url: `/news/${slug}`,
+      ...(article.thumbnail && {
+        images: [{ url: article.thumbnail, width: 1200, height: 630, alt: article.title }],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image" as const,
+      title: article.title,
+      description,
+      ...(article.thumbnail && { images: [article.thumbnail] }),
+    },
+  };
+}
+
 export default async function NewsArticlePage({ params }: NewsArticlePageProps) {
   const { slug } = await params;
   const article = getArticleBySlug(slug);

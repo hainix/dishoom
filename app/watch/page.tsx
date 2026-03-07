@@ -1,5 +1,11 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Watch Bollywood Songs",
+  description: "Stream classic and modern Bollywood songs — dance, love, qawwali, item numbers and more.",
+};
+
 import { getSongsByCategory, getSongCategories } from "@/lib/db";
 import WatchPlayer from "@/components/WatchPlayer";
 import Link from "next/link";

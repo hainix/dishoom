@@ -1,5 +1,12 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Search Bollywood Films",
+  description: "Search 4,000+ Bollywood films by title on Dishoom.",
+  robots: { index: false, follow: false },
+};
+
 import { searchFilms } from "@/lib/db";
 import FilmCard from "@/components/FilmCard";
 import Link from "next/link";

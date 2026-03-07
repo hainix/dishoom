@@ -17,8 +17,29 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Dishoom — Bollywood News, Reviews & Gossip",
-  description: "Your source for Bollywood film reviews, news, and celebrity gossip.",
+  metadataBase: new URL("https://dishoomfilms.com"),
+  title: {
+    default: "Dishoom — Bollywood Reviews, Rankings & News",
+    template: "%s | Dishoom",
+  },
+  description:
+    "Bollywood's definitive film guide. 4,000+ Hindi films ranked and reviewed — from 1950s classics to today's blockbusters.",
+  openGraph: {
+    type: "website",
+    siteName: "Dishoom",
+    locale: "en_IN",
+    url: "https://dishoomfilms.com",
+    title: "Dishoom — Bollywood Reviews, Rankings & News",
+    description:
+      "Bollywood's definitive film guide. 4,000+ Hindi films ranked and reviewed — from 1950s classics to today's blockbusters.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dishoom — Bollywood Reviews, Rankings & News",
+    description:
+      "Bollywood's definitive film guide. 4,000+ Hindi films ranked and reviewed.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

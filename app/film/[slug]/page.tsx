@@ -47,6 +47,39 @@ function SectionHeading({ children, count }: { children: React.ReactNode; count?
   );
 }
 
+export async function generateMetadata({ params }: FilmPageProps) {
+  const { slug } = await params;
+  const film = getFilmBySlug(slug);
+  if (!film) return {};
+
+  const title = film.year ? `${film.title} (${film.year})` : film.title;
+  const description =
+    film.oneliner ??
+    film.plot?.slice(0, 155) ??
+    film.summary?.slice(0, 155) ??
+    `${film.title} on Dishoom`;
+
+  const ogImage = film.backdropSrc ?? film.posterSrc ?? undefined;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "video.movie" as const,
+      url: `/film/${slug}`,
+      ...(ogImage && { images: [{ url: ogImage, width: 1280, height: 720, alt: film.title }] }),
+    },
+    twitter: {
+      card: "summary_large_image" as const,
+      title,
+      description,
+      ...(ogImage && { images: [ogImage] }),
+    },
+  };
+}
+
 export default async function FilmPage({ params }: FilmPageProps) {
   const { slug } = await params;
   const film = getFilmBySlug(slug);

@@ -1,5 +1,11 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "The Dishoom Top 50",
+  description: "The 50 greatest Bollywood films ever made, ranked by the Dishoom score.",
+};
+
 import { getTopFilms } from "@/lib/db";
 import BadgeChip from "@/components/BadgeChip";
 import Link from "next/link";

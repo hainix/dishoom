@@ -1,5 +1,11 @@
 export const dynamic = 'force-dynamic';
 
+
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Browse Bollywood Films",
+  description: "Explore 4,000+ Bollywood films ranked by score. Filter by decade, vibe, or release status.",
+};
 import { getAllFilms } from "@/lib/db";
 import FilmCard from "@/components/FilmCard";
 import Link from "next/link";
@@ -215,3 +221,4 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
     </div>
   );
 }
+// appended below force-dynamic

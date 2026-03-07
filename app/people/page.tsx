@@ -1,5 +1,11 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Bollywood Stars & Directors",
+  description: "Browse Bollywood's greatest actors, directors, and screen icons from every era.",
+};
+
 import { getCuratedPeople, getTopPeople } from "@/lib/db";
 import Link from "next/link";
 import type { Person } from "@/lib/db";

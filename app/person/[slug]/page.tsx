@@ -4,9 +4,33 @@ import { notFound } from "next/navigation";
 import { getPersonBySlug, getFilmographyForPerson } from "@/lib/db";
 import FilmCard from "@/components/FilmCard";
 import Link from "next/link";
+import type { Metadata } from "next";
 
 interface PersonPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PersonPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const person = getPersonBySlug(slug);
+  if (!person) return {};
+  const desc = person.bio?.slice(0, 155) ?? `${person.name} — films, biography and career on Dishoom.`;
+  return {
+    title: person.name,
+    description: desc,
+    openGraph: {
+      title: person.name,
+      description: desc,
+      url: `/person/${slug}`,
+      ...(person.imageUrl && { images: [{ url: person.imageUrl, width: 400, height: 600, alt: person.name }] }),
+    },
+    twitter: {
+      card: person.imageUrl ? "summary_large_image" : "summary",
+      title: person.name,
+      description: desc,
+      ...(person.imageUrl && { images: [person.imageUrl] }),
+    },
+  };
 }
 
 export default async function PersonPage({ params }: PersonPageProps) {

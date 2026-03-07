@@ -1,5 +1,11 @@
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Bollywood News & Reviews",
+  description: "The latest Bollywood news, film reviews, celebrity features, and box office analysis.",
+};
+
 import { getLatestArticles, getSpotlightArticles } from "@/lib/db";
 import Link from "next/link";
 import type { Article } from "@/lib/db";
