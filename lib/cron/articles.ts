@@ -162,6 +162,16 @@ async function fetchCredits(tmdbId: number): Promise<TMDBCredits> {
   return data ?? { crew: [], cast: [] };
 }
 
+// ── Voice system prompt (used in all generators) ─────────────────────────────
+
+const DISHOOM_VOICE = `You write for Dishoom Films — a Bollywood review and gossip site with attitude. Your voice is:
+- Casual and punchy, like a knowledgeable fan talking to a friend over chai
+- Opinionated and direct — say what you think, don't sit on the fence
+- Uses B-town insider shorthand where it fits (SRK, Big B, Akki, but don't overdo it)
+- Short, sharp sentences. No flowery prose. No "one cannot help but notice" style.
+- Dry wit is welcome. Reverence is not.
+- Reads like a smart tabloid, not a film studies essay.`;
+
 // ── Article generators ────────────────────────────────────────────────────────
 
 async function generateFilmNewsArticle(
@@ -184,7 +194,9 @@ async function generateFilmNewsArticle(
     backdrops.push({ src: `${BACKDROP_BASE}${movie.backdrop_path}`, caption: movie.title });
   }
 
-  const prompt = `Write a punchy 5-paragraph Bollywood film review/news article about "${movie.title}" (${movie.release_date?.slice(0, 4) ?? "recent"}).
+  const prompt = `${DISHOOM_VOICE}
+
+Write a 5-paragraph article about "${movie.title}" (${movie.release_date?.slice(0, 4) ?? "recent"}).
 
 Film details:
 - Overview: ${movie.overview || "A new Bollywood release"}
@@ -192,19 +204,19 @@ Film details:
 - Cast: ${topCast || "Ensemble cast"}
 - TMDB score: ${movie.vote_average.toFixed(1)}/10
 
-Write exactly 5 paragraphs (no headings), each 3-5 sentences. Cover:
-P1: Compelling opening hook about the film and what makes it notable
-P2: Plot overview and setup (spoiler-free)
-P3: Standout performances and direction
-P4: Music, cinematography, or other technical highlights
-P5: Verdict and who should watch it
+Write exactly 5 paragraphs (no headings), 3-4 sentences each. Be opinionated. Cover:
+P1: Hook — what's the deal with this film, why does it matter (or not), no throat-clearing
+P2: What it's about — plot setup, no spoilers, but don't be boring about it
+P3: The performances and direction — specific, honest
+P4: Music, look, or whatever else stands out
+P5: Verdict — who will love it, who should skip it, be direct
 
 Also provide:
-- title: punchy headline (max 85 chars, no quotes)
-- description: one crisp sentence (max 150 chars)
+- title: punchy headline under 85 chars. No quotes. Make it sound like something you'd click.
+- description: one snappy sentence under 150 chars
 
-Return JSON only (no markdown fences):
-{"title":"...","description":"...","paragraphs":["P1 text","P2 text","P3 text","P4 text","P5 text"]}`;
+Return JSON only, no markdown fences:
+{"title":"...","description":"...","paragraphs":["P1","P2","P3","P4","P5"]}`;
 
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -242,20 +254,22 @@ async function generateStarSpotlight(
   const personImages = personId ? await fetchPersonImages(personId) : [];
   const images = personImages.map((src) => ({ src, caption: starName }));
 
-  const prompt = `Write a rich 5-paragraph star profile / retrospective about Bollywood star "${starName}" for Dishoom Films, a Bollywood review site.
+  const prompt = `${DISHOOM_VOICE}
 
-Write exactly 5 paragraphs (no headings), each 3-5 sentences. Cover:
-P1: Opening hook — who they are and their cultural significance
-P2: Early career and breakthrough moment
-P3: Defining films and iconic roles
-P4: Their impact on Bollywood and fans
-P5: Legacy and what makes them timeless
+Write a 5-paragraph profile of Bollywood star "${starName}".
+
+Write exactly 5 paragraphs (no headings), 3-4 sentences each. Be specific — name actual films, songs, moments. Don't just say "iconic", show why. Cover:
+P1: Who are they, really? Lead with the most interesting thing about them.
+P2: How they got here — early career, the role that changed everything
+P3: The films and performances that define them — pick the best ones and say something real about them
+P4: Off-screen persona, controversies, or cultural impact — the stuff fans actually talk about
+P5: Where they stand today and what their legacy actually is
 
 Also provide:
-- title: compelling headline with the star's name (max 85 chars, no quotes)
-- description: one memorable sentence (max 150 chars)
+- title: a headline that makes you want to read it (max 85 chars, no quotes)
+- description: one sharp sentence (max 150 chars)
 
-Return JSON only (no markdown fences):
+Return JSON only, no markdown fences:
 {"title":"...","description":"...","paragraphs":["P1","P2","P3","P4","P5"]}`;
 
   const message = await client.messages.create({
@@ -299,21 +313,22 @@ async function generateListicle(
      ORDER BY rating DESC LIMIT 15`
   ).all() as PosterRow[];
 
-  const prompt = `Write a Bollywood listicle article for Dishoom Films about: "${topic}"
+  const prompt = `${DISHOOM_VOICE}
 
-Write an introductory paragraph (3-4 sentences), then a numbered list of exactly 10 items.
-For each item write: <strong>[Film/Name]</strong> — 2-3 sentence description.
-Do NOT use <ol> or <li> tags — write each as plain text like:
-1. <strong>Film Title</strong> — Description here.
-2. <strong>Film Title</strong> — Description here.
+Write a listicle about: "${topic}"
+
+Write a sharp intro paragraph (3-4 sentences — make an argument, don't just describe what the list is), then exactly 10 numbered items.
+Each item: <strong>[Film or Name]</strong> — 2-3 sentences. Be specific about why it's on the list. Have opinions.
+Do NOT use <ol> or <li> tags. Format each as plain text like:
+1. <strong>Film Title</strong> — Here's why it belongs here.
 ...
 
 Also provide:
-- title: the topic as a punchy headline (max 85 chars)
-- description: one sentence (max 150 chars)
+- title: punchy headline under 85 chars
+- description: one sentence under 150 chars
 
-Return JSON only (no markdown fences):
-{"title":"...","description":"...","intro":"intro paragraph text","items":["1. <strong>...</strong> — ...","2. ...","..."]}`;
+Return JSON only, no markdown fences:
+{"title":"...","description":"...","intro":"intro paragraph","items":["1. <strong>...</strong> — ...","2. ...","..."]}`;
 
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -390,25 +405,27 @@ async function generateClassicRetro(
     images.push(...extra);
   }
 
-  const prompt = `Write a passionate 5-paragraph retrospective about the classic Bollywood film "${film.title}" (${film.year ?? "classic era"}) for Dishoom Films.
+  const prompt = `${DISHOOM_VOICE}
+
+Write a 5-paragraph retrospective about the classic Bollywood film "${film.title}" (${film.year ?? "classic era"}).
 
 Film details:
 - Plot: ${film.plot ?? "A landmark of Indian cinema"}
 - Stars: ${film.stars ?? "Iconic cast"}
 - Dishoom rating: ${film.rating ?? "N/A"}/100
 
-Write exactly 5 paragraphs (no headings), each 3-5 sentences. Cover:
-P1: Opening hook — why this film matters and its place in Bollywood history
-P2: Plot and narrative craft (spoiler-light)
-P3: Performances that became iconic
-P4: Music, songs, and visual style
-P5: Why it endures and who needs to watch it today
+Write exactly 5 paragraphs (no headings), 3-4 sentences each. Be specific — mention actual scenes, songs, dialogue. Don't just say it's a classic, make the reader feel why. Cover:
+P1: Lead with the most arresting thing about the film — a scene, a line, a moment that stays with you
+P2: The story and how it's told — what makes the screenplay or direction interesting
+P3: The performances — who delivers and how, with specifics
+P4: The music, look, and atmosphere — songs that defined careers, scenes that defined the era
+P5: Why it still holds up (or where it shows its age) — be honest, not just reverential
 
 Also provide:
 - title: retrospective headline with the film name (max 85 chars, no quotes)
 - description: one evocative sentence (max 150 chars)
 
-Return JSON only (no markdown fences):
+Return JSON only, no markdown fences:
 {"title":"...","description":"...","paragraphs":["P1","P2","P3","P4","P5"]}`;
 
   const message = await client.messages.create({
