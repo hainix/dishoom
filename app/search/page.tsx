@@ -1,5 +1,5 @@
 import { searchFilms } from "@/lib/db";
-import MovieBox from "@/components/MovieBox";
+import FilmCard from "@/components/FilmCard";
 import Link from "next/link";
 
 interface SearchPageProps {
@@ -12,27 +12,30 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const films = query ? searchFilms(query, 48) : [];
 
   return (
-    <div className="p-4 max-w-5xl">
-      <h1 className="text-2xl font-bold text-gray-800 mb-1 pb-2 border-b-2 border-dishoom-red uppercase tracking-wide">
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
+      <h1
+        className="text-2xl font-bold mb-1 pb-2 uppercase tracking-wide"
+        style={{ fontFamily: "var(--font-display)", color: "white", borderBottom: "1px solid rgba(212,175,55,0.3)" }}
+      >
         Search Results
       </h1>
       {query && (
-        <p className="text-gray-500 text-sm mb-6">
+        <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.5)" }}>
           {films.length} result{films.length !== 1 ? "s" : ""} for &ldquo;{query}&rdquo;
         </p>
       )}
 
       {films.length > 0 ? (
-        <div className="flex flex-wrap gap-3">
-          {films.map((film) => <MovieBox key={film.id} film={film} />)}
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(145px, 1fr))" }}>
+          {films.map((film) => <FilmCard key={film.id} film={film} />)}
         </div>
       ) : query ? (
         <div className="py-16 text-center">
-          <p className="text-gray-500 text-lg mb-2">No films found for &ldquo;{query}&rdquo;</p>
-          <p className="text-gray-400 text-sm">Try a different spelling or search for an actor&rsquo;s name</p>
+          <p className="text-lg mb-2" style={{ color: "rgba(255,255,255,0.5)" }}>No films found for &ldquo;{query}&rdquo;</p>
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>Try a different spelling or search for an actor&rsquo;s name</p>
         </div>
       ) : (
-        <div className="py-16 text-center text-gray-400">
+        <div className="py-16 text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
           Use the search bar above to find films
         </div>
       )}

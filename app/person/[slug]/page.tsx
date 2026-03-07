@@ -19,7 +19,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
   return (
     <div>
       {/* Profile hero */}
-      <div className="bg-dishoom-deep px-6 py-12">
+      <div className="px-6 py-12" style={{ background: "#0d0505", borderBottom: "1px solid rgba(212,175,55,0.2)" }}>
         <div className="flex gap-8 items-center" style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div className="flex-shrink-0">
             {person.imageUrl ? (
@@ -76,8 +76,8 @@ export default async function PersonPage({ params }: PersonPageProps) {
         {asDirector.length > 0 && (
           <section className="mb-12">
             <h2
-              className="text-2xl font-bold text-gray-900 mb-6 pb-3"
-              style={{ fontFamily: "var(--font-display)", borderBottom: "2px solid #D4AF37" }}
+              className="text-2xl font-bold mb-6 pb-3"
+              style={{ color: "white", fontFamily: "var(--font-display)", borderBottom: "2px solid #D4AF37" }}
             >
               Directed ({asDirector.length})
             </h2>
@@ -90,8 +90,8 @@ export default async function PersonPage({ params }: PersonPageProps) {
         {asActor.length > 0 && (
           <section className="mb-8">
             <h2
-              className="text-2xl font-bold text-gray-900 mb-6 pb-3"
-              style={{ fontFamily: "var(--font-display)", borderBottom: "2px solid #D4AF37" }}
+              className="text-2xl font-bold mb-6 pb-3"
+              style={{ color: "white", fontFamily: "var(--font-display)", borderBottom: "2px solid #D4AF37" }}
             >
               {asDirector.length > 0 ? "Also Appeared In" : "Filmography"} ({asActor.length})
             </h2>
@@ -101,7 +101,7 @@ export default async function PersonPage({ params }: PersonPageProps) {
           </section>
         )}
 
-        <div className="mt-8 pt-6 border-t border-gray-100">
+        <div className="mt-8 pt-6" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
           <Link href="/people" className="text-dishoom-red text-sm hover:underline">← All stars</Link>
         </div>
       </div>

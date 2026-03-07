@@ -22,14 +22,14 @@
 
 body {
   font-family: var(--font-body);
-  color: #454545;
-  background-color: #1A0A00;
+  color: rgba(255,255,255,0.75);
+  background-color: #0d0505;
 }
 
 .site-wrapper {
   max-width: 1200px;
   margin: 0 auto;
-  background-color: #FFF8EE;
+  background-color: #0d0505;
 }
 
 /* Gold horizontal rule */
@@ -79,7 +79,7 @@ body {
   padding: 5px 14px;
   border: 2px solid #D4AF37;
   border-radius: 999px;
-  color: #1A0A00;
+  color: white;
   background: transparent;
   cursor: pointer;
   transition: background 150ms, color 150ms;
@@ -183,7 +183,7 @@ body {
 .std-posts .post {
   position: relative;
   margin: 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   padding: 12px 0;
   overflow: hidden;
 }
@@ -193,12 +193,13 @@ body {
   line-height: 22px;
   padding: 0;
   margin-bottom: 5px;
+  color: rgba(255,255,255,0.9);
 }
 
 .std-posts .post .description {
   font-size: 13px;
   line-height: 16px;
-  color: #666;
+  color: rgba(255,255,255,0.5);
 }
 
 .std-posts .thumb-unit {

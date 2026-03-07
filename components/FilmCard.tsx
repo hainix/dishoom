@@ -5,6 +5,7 @@ import type { Film } from "@/lib/db";
 
 interface FilmCardProps {
   film: Film;
+  statusLabel?: string;
 }
 
 function ratingColor(r: number | null) {
@@ -20,7 +21,7 @@ function getPosterUrl(film: Film): string {
   return `https://placehold.co/160x240/1A0A00/FFF8EE?text=${encodeURIComponent(film.title.slice(0, 12))}`;
 }
 
-export default function FilmCard({ film }: FilmCardProps) {
+export default function FilmCard({ film, statusLabel }: FilmCardProps) {
   return (
     <Link href={`/film/${film.slug}`} className="block group">
       {/* Poster */}
@@ -38,6 +39,16 @@ export default function FilmCard({ film }: FilmCardProps) {
               `https://placehold.co/160x240/1A0A00/FFF8EE?text=${encodeURIComponent(film.title.slice(0, 12))}`;
           }}
         />
+
+        {/* Status badge */}
+        {statusLabel && (
+          <div
+            className="absolute top-2 right-2 text-xs font-bold uppercase px-2 py-0.5 rounded"
+            style={{ backgroundColor: "#EF4832", color: "white", letterSpacing: "0.05em", zIndex: 2 }}
+          >
+            {statusLabel}
+          </div>
+        )}
 
         {/* Rating circle */}
         {film.rating !== null && (
@@ -61,11 +72,11 @@ export default function FilmCard({ film }: FilmCardProps) {
 
       {/* Title */}
       <div className="pt-2 pb-1">
-        <p className="text-gray-900 text-xs font-semibold leading-tight line-clamp-2"
-           style={{ fontFamily: "var(--font-display)" }}>
+        <p className="text-xs font-semibold leading-tight line-clamp-2"
+           style={{ fontFamily: "var(--font-display)", color: "rgba(255,255,255,0.9)" }}>
           {film.title}
         </p>
-        {film.year && <p className="text-gray-400 text-xs mt-0.5">{film.year}</p>}
+        {film.year && <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>{film.year}</p>}
       </div>
     </Link>
   );

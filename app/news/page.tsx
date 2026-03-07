@@ -115,23 +115,23 @@ function ArticleCard({ article }: { article: Article }) {
           </span>
         )}
         {article.celebrity && !article.filmTitle && (
-          <span className="text-xs text-gray-400 font-medium">{article.celebrity}</span>
+          <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>{article.celebrity}</span>
         )}
       </div>
 
       {/* Title */}
       <h3
-        className="font-bold text-gray-900 leading-snug mb-1.5 group-hover:text-dishoom-red transition-colors line-clamp-2"
-        style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem" }}
+        className="font-bold leading-snug mb-1.5 group-hover:text-dishoom-red transition-colors line-clamp-2"
+        style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", color: "rgba(255,255,255,0.9)" }}
       >
         {article.title}
       </h3>
 
       {article.description && (
-        <p className="text-sm text-gray-500 leading-relaxed line-clamp-2">{article.description}</p>
+        <p className="text-sm leading-relaxed line-clamp-2" style={{ color: "rgba(255,255,255,0.5)" }}>{article.description}</p>
       )}
 
-      <p className="text-xs text-gray-400 mt-2">{formatDate(article.createdAt)}</p>
+      <p className="text-xs mt-2" style={{ color: "rgba(255,255,255,0.35)" }}>{formatDate(article.createdAt)}</p>
     </Link>
   );
 }
@@ -152,7 +152,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   return (
     <div>
       {/* Banner */}
-      <div className="bg-dishoom-deep py-10 px-6">
+      <div className="py-10 px-6" style={{ background: "#0d0505", borderBottom: "1px solid rgba(212,175,55,0.2)" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <p className="text-dishoom-gold text-xs font-bold uppercase tracking-widest mb-2">Dishoom</p>
           <h1 className="text-4xl font-bold text-white" style={{ fontFamily: "var(--font-display)" }}>
@@ -166,7 +166,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
 
       <div className="px-6 py-8" style={{ maxWidth: 1200, margin: "0 auto" }}>
         {allArticles.length === 0 ? (
-          <p className="text-gray-400 text-center py-16">No articles yet — check back soon.</p>
+          <p className="text-center py-16" style={{ color: "rgba(255,255,255,0.3)" }}>No articles yet — check back soon.</p>
         ) : (
           <>
             {/* Lead article */}
@@ -179,9 +179,9 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             {/* Divider */}
             {page === 1 && gridArticles.length > 0 && (
               <div className="flex items-center gap-4 mb-8">
-                <div className="h-px flex-1 bg-gray-200" />
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Latest Stories</p>
-                <div className="h-px flex-1 bg-gray-200" />
+                <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.1)" }} />
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>Latest Stories</p>
+                <div className="h-px flex-1" style={{ background: "rgba(255,255,255,0.1)" }} />
               </div>
             )}
 
@@ -195,11 +195,12 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             )}
 
             {/* Pagination */}
-            <div className="flex items-center justify-center gap-3 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-center gap-3 pt-6" style={{ borderTop: "1px solid rgba(212,175,55,0.2)" }}>
               {page > 1 && (
                 <Link
                   href={`/news?page=${page - 1}`}
-                  className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-sm font-medium rounded transition-colors"
+                  style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.75)" }}
                 >
                   ← Previous
                 </Link>

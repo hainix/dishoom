@@ -85,6 +85,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   "courtly":             "🏯 Courtly",
 };
 
+const TAG_GROUPS = [
+  { label: "Era",      tags: ["golden-age", "black-and-white", "retro-70s"] },
+  { label: "Style",    tags: ["qawwali", "ghazal", "mujra", "bhajan", "folk", "classical", "sufi", "item-number", "instrumental"] },
+  { label: "Mood",     tags: ["soulful", "romantic", "tear-jerker", "heartbreak", "melancholy", "bittersweet", "philosophical", "defiant", "playful", "euphoric"] },
+  { label: "Energy",   tags: ["earworm", "anthem", "singalong", "dance-floor", "campfire", "crowd-pleaser", "slow-burn"] },
+  { label: "Theme",    tags: ["devotional", "village-life", "friendship", "maternal-love", "radha-krishna", "monsoon", "rain-romance", "patriotic", "mughal-era", "holi", "wedding", "british-india", "coming-of-age", "college-anthem"] },
+  { label: "Composer", tags: ["ar-rahman", "raj-kapoor", "shankar-ehsaan-loy", "lata-mangeshkar"] },
+  { label: "Cultural", tags: ["iconic", "evergreen", "oscar-winning", "bollywood-crossover", "bombshell", "vagabond", "courtly"] },
+];
+
 export default async function WatchPage({ searchParams }: WatchPageProps) {
   const params = await searchParams;
   const category = params.category || "golden-age";
@@ -93,63 +103,162 @@ export default async function WatchPage({ searchParams }: WatchPageProps) {
   const categories = getSongCategories();
   const { songs, total } = getSongsByCategory(category, { page, pageSize: 24 });
   const totalPages = Math.ceil(total / 24);
-  const label = CATEGORY_LABELS[category] ?? category;
+
+  const countMap: Record<string, number> = Object.fromEntries(
+    categories.map(({ category: cat, count }) => [cat, count])
+  );
 
   return (
-    <div className="flex flex-col" style={{ minHeight: "calc(100vh - 56px)", background: "#0d0505" }}>
+    <div
+      style={{
+        width: "100vw",
+        marginLeft: "calc(50% - 50vw)",
+        minHeight: "calc(100vh - 85px)",
+        background: "#0d0505",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Three-column layout */}
+      <div className="flex flex-1" style={{ minHeight: 0, height: "calc(100vh - 85px)" }}>
 
-      {/* ── Category strip ───────────────────────────────────────────── */}
-      <div className="overflow-x-auto border-b flex-shrink-0"
-           style={{ background: "#1a0a00", borderColor: "rgba(255,255,255,0.08)" }}>
-        <div className="flex gap-1 px-4 py-3" style={{ minWidth: "max-content" }}>
-          {categories.map(({ category: cat, count }) => {
-            const isActive = cat === category;
-            const catLabel = CATEGORY_LABELS[cat] ?? cat;
-            return (
-              <Link
-                key={cat}
-                href={`/watch?category=${encodeURIComponent(cat)}&page=1`}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
-                style={{
-                  background: isActive ? "#EF4832" : "rgba(255,255,255,0.07)",
-                  color: isActive ? "white" : "rgba(255,255,255,0.55)",
-                }}
-              >
-                {catLabel}
-                <span
-                  className="tabular-nums"
-                  style={{ color: isActive ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.3)", fontSize: 10 }}
-                >
-                  {count}
-                </span>
-              </Link>
-            );
-          })}
+        {/* ── Desktop sidebar ───────────────────────────────────────────── */}
+        <aside
+          className="hidden lg:flex flex-col flex-shrink-0 overflow-y-auto"
+          style={{ width: 260, background: "#110404", borderRight: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          {/* Sidebar header */}
+          <div className="px-6 pt-6 pb-3 flex-shrink-0">
+            <p
+              className="text-xs font-bold uppercase tracking-widest"
+              style={{ color: "rgba(255,255,255,0.25)" }}
+            >
+              Browse by Tag
+            </p>
+          </div>
+
+          {/* Tag groups */}
+          <nav className="flex-1 pb-6">
+            {TAG_GROUPS.map((group) => {
+              const visibleTags = group.tags.filter((tag) => (countMap[tag] ?? 0) > 0);
+              if (visibleTags.length === 0) return null;
+              return (
+                <div key={group.label} className="mb-1">
+                  <p
+                    className="px-6 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: "rgba(255,255,255,0.2)", fontSize: 9 }}
+                  >
+                    {group.label}
+                  </p>
+                  {visibleTags.map((tag) => {
+                    const isActive = tag === category;
+                    const label = CATEGORY_LABELS[tag] ?? tag;
+                    const count = countMap[tag] ?? 0;
+                    return (
+                      <Link
+                        key={tag}
+                        href={`/watch?category=${encodeURIComponent(tag)}&page=1`}
+                        className="flex items-center justify-between px-6 py-2 text-xs transition-colors"
+                        style={{
+                          borderLeft: isActive ? "3px solid #EF4832" : "3px solid transparent",
+                          background: isActive ? "rgba(239,72,50,0.08)" : "transparent",
+                          color: isActive ? "#FFF8EE" : "rgba(255,255,255,0.55)",
+                        }}
+                      >
+                        <span className="truncate">{label}</span>
+                        <span
+                          className="ml-2 flex-shrink-0 tabular-nums"
+                          style={{ color: isActive ? "#D4AF37" : "rgba(255,255,255,0.2)", fontSize: 10 }}
+                        >
+                          {count}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* ── Content area (player + playlist) ─────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0">
+
+          {/* Mobile tag strip */}
+          <div
+            className="block lg:hidden overflow-x-auto flex-shrink-0 border-b"
+            style={{ background: "#1a0a00", borderColor: "rgba(255,255,255,0.08)" }}
+          >
+            <div className="flex items-center gap-0 px-3 py-2.5" style={{ minWidth: "max-content" }}>
+              {TAG_GROUPS.map((group, gi) => {
+                const visibleTags = group.tags.filter((tag) => (countMap[tag] ?? 0) > 0);
+                if (visibleTags.length === 0) return null;
+                return (
+                  <div key={group.label} className="flex items-center">
+                    {gi > 0 && (
+                      <div
+                        className="mx-3 flex-shrink-0"
+                        style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }}
+                      />
+                    )}
+                    <span
+                      className="mr-2 uppercase font-bold flex-shrink-0"
+                      style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, letterSpacing: "0.08em" }}
+                    >
+                      {group.label}
+                    </span>
+                    <div className="flex gap-1">
+                      {visibleTags.map((tag) => {
+                        const isActive = tag === category;
+                        const label = CATEGORY_LABELS[tag] ?? tag;
+                        return (
+                          <Link
+                            key={tag}
+                            href={`/watch?category=${encodeURIComponent(tag)}&page=1`}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0"
+                            style={{
+                              background: isActive ? "#EF4832" : "rgba(255,255,255,0.08)",
+                              color: isActive ? "white" : "rgba(255,255,255,0.55)",
+                            }}
+                          >
+                            {label}
+                            <span style={{ color: isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)", fontSize: 10 }}>
+                              {countMap[tag] ?? 0}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Player or empty state */}
+          {songs.length > 0 ? (
+            <div className="flex-1 overflow-hidden flex">
+              <WatchPlayer
+                songs={songs}
+                category={category}
+                page={page}
+                totalPages={totalPages}
+                categoryLabels={CATEGORY_LABELS}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center py-20 text-center px-6">
+              <p className="text-6xl mb-5">🎵</p>
+              <p className="text-lg font-semibold mb-2" style={{ color: "rgba(255,255,255,0.7)" }}>
+                Songs coming soon
+              </p>
+              <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
+                We&rsquo;re adding YouTube links for our 16,000+ song database.
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Player or empty state ─────────────────────────────────────── */}
-      {songs.length > 0 ? (
-        <div className="flex-1 overflow-hidden" style={{ maxHeight: "calc(100vh - 56px - 52px)" }}>
-          <WatchPlayer
-            songs={songs}
-            category={category}
-            categoryLabel={label}
-            total={total}
-            page={page}
-            totalPages={totalPages}
-          /></div>
-      ) : (
-        <div className="flex-1 flex flex-col items-center justify-center py-20 text-center px-6">
-          <p className="text-6xl mb-5">🎵</p>
-          <p className="text-lg font-semibold mb-2" style={{ color: "rgba(255,255,255,0.7)" }}>
-            Songs coming soon
-          </p>
-          <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
-            We&rsquo;re adding YouTube links for our 16,000+ song database.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

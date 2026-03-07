@@ -41,7 +41,7 @@ export default function VibeGrid({ stats }: VibeGridProps) {
   if (vibes.length === 0) return null;
 
   return (
-    <div className="px-4 py-8" style={{ backgroundColor: "#1A0A00" }}>
+    <div className="px-4 py-8" style={{ backgroundColor: "#0d0505" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <div className="flex items-center gap-3 mb-6">
           <hr className="gold-rule flex-1" />
@@ -82,7 +82,7 @@ export default function VibeGrid({ stats }: VibeGridProps) {
                 <p className="text-white text-xs font-bold uppercase tracking-wide leading-tight">
                   {name}
                 </p>
-                <p className="text-gray-400 text-xs mt-0.5">{stat.count} films</p>
+                <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{stat.count} films</p>
               </div>
             </Link>
           ))}

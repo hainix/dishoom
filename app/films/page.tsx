@@ -3,7 +3,7 @@ import FilmCard from "@/components/FilmCard";
 import Link from "next/link";
 
 interface FilmsPageProps {
-  searchParams: Promise<{ decade?: string; minRating?: string; sort?: string; page?: string; badge?: string }>;
+  searchParams: Promise<{ decade?: string; minRating?: string; sort?: string; page?: string; badge?: string; status?: string }>;
 }
 
 const DECADES = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -28,8 +28,9 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
   const sort = (params.sort as "rating" | "year" | "title") || "rating";
   const page = params.page ? Number(params.page) : 1;
   const badge = params.badge || undefined;
+  const status = params.status || undefined;
 
-  const { films, total } = getAllFilms({ decade, minRating, sort, page, pageSize: 24, badge });
+  const { films, total } = getAllFilms({ decade, minRating, sort, page, pageSize: 24, badge, status });
   const totalPages = Math.ceil(total / 24);
 
   function buildUrl(overrides: Record<string, string | undefined>) {
@@ -39,6 +40,7 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
     if (sort !== "rating") p.set("sort", sort);
     if (page > 1) p.set("page", String(page));
     if (badge) p.set("badge", badge);
+    if (status) p.set("status", status);
     for (const [k, v] of Object.entries(overrides)) {
       if (v === undefined) p.delete(k);
       else p.set(k, v);
@@ -47,7 +49,7 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
     return `/films${s ? `?${s}` : ""}`;
   }
 
-  const hasFilters = !!(decade || badge);
+  const hasFilters = !!(decade || badge || status);
 
   return (
     <div>
@@ -84,8 +86,27 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
       </div>
 
       {/* Filters */}
-      <div className="border-b border-gray-200 bg-white sticky top-0 z-10 shadow-sm">
+      <div className="sticky top-0 z-10" style={{ background: "#0d0505", borderBottom: "1px solid rgba(212,175,55,0.2)" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }} className="px-6 py-3">
+          {/* Status pills */}
+          <div className="flex flex-wrap gap-1.5 mb-2 pb-2" style={{ borderBottom: "1px solid rgba(212,175,55,0.1)" }}>
+            {[
+              { label: "🎬 In Cinemas", value: "in_theaters" },
+              { label: "📱 Streaming", value: "streaming" },
+              { label: "📅 Coming Soon", value: "coming_soon" },
+            ].map(({ label, value }) => (
+              <Link
+                key={value}
+                href={buildUrl({ status: status === value ? undefined : value, page: "1" })}
+                className="px-3 py-1 text-xs rounded-full font-semibold transition-colors"
+                style={status === value
+                  ? { backgroundColor: "#EF4832", color: "white" }
+                  : { backgroundColor: "rgba(239,72,50,0.12)", color: "rgba(239,72,50,0.85)", border: "1px solid rgba(239,72,50,0.3)" }}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
           {/* Vibes */}
           <div className="flex flex-wrap gap-1.5 mb-2">
             <Link
@@ -106,14 +127,13 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
           </div>
           {/* Decades */}
           <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide mr-1">Era</span>
+            <span className="text-xs font-medium uppercase tracking-wide mr-1" style={{ color: "rgba(255,255,255,0.4)" }}>Era</span>
             <Link
               href={buildUrl({ decade: undefined, page: "1" })}
-              className={`px-3 py-1 text-xs rounded-full font-semibold transition-colors ${
-                !decade
-                  ? "bg-dishoom-deep text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className="px-3 py-1 text-xs rounded-full font-semibold transition-colors"
+              style={!decade
+                ? { backgroundColor: "#EF4832", color: "white" }
+                : { backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)" }}
             >
               All
             </Link>
@@ -121,11 +141,10 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
               <Link
                 key={d}
                 href={buildUrl({ decade: String(d), page: "1" })}
-                className={`px-3 py-1 text-xs rounded-full font-semibold transition-colors ${
-                  decade === d
-                    ? "bg-dishoom-deep text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className="px-3 py-1 text-xs rounded-full font-semibold transition-colors"
+                style={decade === d
+                  ? { backgroundColor: "#EF4832", color: "white" }
+                  : { backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)" }}
               >
                 {d}s
               </Link>
@@ -136,11 +155,14 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
 
       {/* Active filter label */}
       {hasFilters && (
-        <div className="px-6 py-3 bg-dishoom-cream/60 border-b border-gray-100" style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div className="flex items-center gap-3 text-sm text-gray-700">
+        <div className="px-6 py-3" style={{ maxWidth: 1200, margin: "0 auto", background: "rgba(212,175,55,0.07)", borderBottom: "1px solid rgba(212,175,55,0.15)" }}>
+          <div className="flex items-center gap-3 text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
             <span>Showing:</span>
             {badge && <strong>{badge}</strong>}
             {decade && <strong>{decade}s</strong>}
+            {status === 'in_theaters' && <strong>In Cinemas</strong>}
+            {status === 'streaming' && <strong>Streaming Now</strong>}
+            {status === 'coming_soon' && <strong>Coming Soon</strong>}
             <Link href="/films" className="text-dishoom-red hover:underline text-xs ml-auto">
               ✕ clear filters
             </Link>
@@ -155,7 +177,7 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
             <FilmCard key={film.id} film={film} />
           ))}
           {films.length === 0 && (
-            <p className="text-gray-400 text-center py-16 col-span-full">
+            <p className="text-center py-16 col-span-full" style={{ color: "rgba(255,255,255,0.3)" }}>
               No films found with these filters.
             </p>
           )}
@@ -163,22 +185,24 @@ export default async function FilmsPage({ searchParams }: FilmsPageProps) {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-10 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-center gap-3 mt-10 pt-6" style={{ borderTop: "1px solid rgba(212,175,55,0.2)" }}>
             {page > 1 && (
               <Link
                 href={buildUrl({ page: String(page - 1) })}
-                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded transition-colors"
+                style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.75)" }}
               >
                 ← Previous
               </Link>
             )}
-            <span className="text-sm text-gray-500">
+            <span className="text-sm" style={{ color: "rgba(255,255,255,0.5)" }}>
               Page <strong>{page}</strong> of {totalPages}
             </span>
             {page < totalPages && (
               <Link
                 href={buildUrl({ page: String(page + 1) })}
-                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded transition-colors"
+                style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.75)" }}
               >
                 Next →
               </Link>

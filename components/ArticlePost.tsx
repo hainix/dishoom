@@ -39,14 +39,14 @@ export default function ArticlePost({ article, showThumb = true }: ArticlePostPr
         {article.description && (
           <p className="description">{article.description}</p>
         )}
-        <div className="text-xs text-gray-400 mt-1">
+        <div className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
           {article.filmTitle && (
-            <Link href={`/film/${article.filmSlug}`} className="text-blue-600 hover:underline mr-2">
+            <Link href={`/film/${article.filmSlug}`} className="text-dishoom-gold hover:underline mr-2">
               {article.filmTitle}
             </Link>
           )}
           {article.celebrity && (
-            <span className="text-gray-500">{article.celebrity}</span>
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>{article.celebrity}</span>
           )}
         </div>
       </div>

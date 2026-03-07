@@ -20,6 +20,8 @@ export function getDb(): Database.Database {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export type FilmStatus = 'in_theaters' | 'streaming' | 'coming_soon' | 'released';
+
 export interface Film {
   id: number;
   oldId: number | null;
@@ -155,9 +157,10 @@ export function getAllFilms(
     page?: number;
     pageSize?: number;
     badge?: string;
+    status?: FilmStatus | string;
   } = {}
 ): { films: Film[]; total: number } {
-  const { decade, minRating, sort = "rating", page = 1, pageSize = 24, badge } = opts;
+  const { decade, minRating, sort = "rating", page = 1, pageSize = 24, badge, status } = opts;
 
   const conditions: string[] = [];
   const params: (string | number)[] = [];
@@ -173,6 +176,10 @@ export function getAllFilms(
   if (badge) {
     conditions.push("badges LIKE ?");
     params.push(`%${badge}%`);
+  }
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
   }
 
   const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
@@ -290,6 +297,27 @@ export function getTopPeople(type: "actor" | "director", limit = 20): (Person & 
     .all(type, limit) as (Person & { filmCount: number })[];
 }
 
+/** Fetch a curated list of people by slug, preserving the provided order. */
+export function getCuratedPeople(slugs: string[]): (Person & { filmCount: number })[] {
+  if (slugs.length === 0) return [];
+  const db = getDb();
+  const placeholders = slugs.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `SELECT p.id, p.name, p.slug, p.image_url as imageUrl, p.bio, p.type,
+              p.birthdate, p.birthplace, COUNT(fp.id) as filmCount
+       FROM people p
+       LEFT JOIN film_people fp ON p.id = fp.person_id
+       WHERE p.slug IN (${placeholders})
+       GROUP BY p.id`
+    )
+    .all(...slugs) as (Person & { filmCount: number })[];
+  const bySlug = new Map(rows.map((r) => [r.slug, r]));
+  return slugs
+    .map((s) => bySlug.get(s))
+    .filter((p): p is Person & { filmCount: number } => p !== undefined);
+}
+
 // ── Review queries ────────────────────────────────────────────────────────────
 
 export function getReviewsForFilm(filmId: number, limit = 20): Review[] {
@@ -404,6 +432,19 @@ export function getSongCategories(): { category: string; count: number }[] {
     .map(([category, count]) => ({ category, count }));
 }
 
+
+export function getFeaturedSongs(limit = 4): SongWithFilm[] {
+  return getDb()
+    .prepare(
+      `SELECT s.id, s.film_id as filmId, s.title, s.youtube_id as youtubeId,
+              s.category, f.title as filmTitle, f.slug as filmSlug
+       FROM songs s JOIN films f ON s.film_id = f.id
+       WHERE s.youtube_id IS NOT NULL AND s.youtube_id != ''
+         AND s.category IS NOT NULL AND s.category != ''
+       ORDER BY RANDOM() LIMIT ?`
+    )
+    .all(limit) as SongWithFilm[];
+}
 
 // ── Homepage helpers ───────────────────────────────────────────────────────────
 

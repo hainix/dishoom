@@ -7,19 +7,17 @@ import type { SongWithFilm } from "@/lib/db";
 interface WatchPlayerProps {
   songs: SongWithFilm[];
   category: string;
-  categoryLabel: string;
-  total: number;
   page: number;
   totalPages: number;
+  categoryLabels: Record<string, string>;
 }
 
 export default function WatchPlayer({
   songs,
   category,
-  categoryLabel,
-  total,
   page,
   totalPages,
+  categoryLabels,
 }: WatchPlayerProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -59,15 +57,16 @@ export default function WatchPlayer({
   if (!activeSong) return null;
 
   const thumbUrl = `https://img.youtube.com/vi/${activeSong.youtubeId}/hqdefault.jpg`;
+  const activeTags = activeSong.category ? activeSong.category.split(",").slice(0, 6) : [];
 
   return (
-    <div className="flex flex-col lg:flex-row" style={{ height: "100%", minHeight: 0 }}>
+    <div className="flex flex-col lg:flex-row w-full" style={{ height: "100%", minHeight: 0 }}>
 
-      {/* ── Left: player + info ───────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col" style={{ background: "#0d0505" }}>
+      {/* ── Centre: player + info ─────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0" style={{ background: "#0d0505" }}>
 
-        {/* Player */}
-        <div className="relative w-full" style={{ paddingBottom: "56.25%", height: 0 }}>
+        {/* Player — 16:9 */}
+        <div className="relative w-full flex-shrink-0" style={{ paddingBottom: "56.25%", height: 0 }}>
           {isPlaying ? (
             <iframe
               key={activeSong.id}
@@ -105,77 +104,91 @@ export default function WatchPlayer({
           )}
         </div>
 
-        {/* Song info bar */}
-        <div className="flex items-center gap-4 px-5 py-4" style={{ background: "#1a0a00" }}>
-          {/* Prev / Next */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={prev}
-              disabled={activeIndex === 0}
-              className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
-              style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
-              aria-label="Previous"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
-                <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
-              </svg>
-            </button>
-            <button
-              onClick={next}
-              disabled={activeIndex === songs.length - 1}
-              className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
-              style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
-              aria-label="Next"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
-                <path d="M6 18l8.5-6L6 6v12zm2.5-6 6-4.26V16.26z" />
-              </svg>
-            </button>
+        {/* Spacious song info section */}
+        <div className="flex-1 px-8 py-6 overflow-y-auto" style={{ background: "#110404" }}>
+          {/* Top row: nav buttons + position */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={prev}
+                disabled={activeIndex === 0}
+                className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
+                style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
+                aria-label="Previous"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
+                  <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
+                </svg>
+              </button>
+              <button
+                onClick={next}
+                disabled={activeIndex === songs.length - 1}
+                className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
+                style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
+                aria-label="Next"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
+                  <path d="M6 18l8.5-6L6 6v12zm2.5-6 6-4.26V16.26z" />
+                </svg>
+              </button>
+            </div>
+            <span className="text-xs tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+              {activeIndex + 1} / {songs.length}
+              <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.15)" }}> · ← → to navigate</span>
+            </span>
           </div>
 
-          {/* Title + film */}
-          <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold text-sm leading-tight truncate"
-               style={{ fontFamily: "var(--font-display)" }}>
-              {activeSong.title || "Untitled"}
-            </p>
-            <Link
-              href={`/film/${activeSong.filmSlug}`}
-              className="text-xs truncate hover:underline"
-              style={{ color: "#D4AF37" }}
-            >
-              {activeSong.filmTitle}
-            </Link>
-          </div>
+          {/* Song title */}
+          <h2
+            className="text-2xl font-bold leading-tight mb-1"
+            style={{ fontFamily: "var(--font-display)", color: "#FFF8EE" }}
+          >
+            {activeSong.title || "Untitled"}
+          </h2>
 
-          {/* Position */}
-          <div className="flex-shrink-0 text-xs tabular-nums" style={{ color: "rgba(255,255,255,0.35)" }}>
-            {activeIndex + 1} / {songs.length}
-          </div>
-        </div>
+          {/* Film link */}
+          <Link
+            href={`/film/${activeSong.filmSlug}`}
+            className="inline-flex items-center gap-1 text-sm hover:underline mb-4"
+            style={{ color: "#D4AF37" }}
+          >
+            {activeSong.filmTitle}
+            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 12, height: 12, opacity: 0.7 }}>
+              <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
+          </Link>
 
-        {/* Category label + total */}
-        <div className="px-5 py-3 text-xs flex-shrink-0 border-t"
-             style={{ color: "rgba(255,255,255,0.3)", borderColor: "rgba(255,255,255,0.06)", background: "#0d0505" }}>
-          {categoryLabel} · {total} songs total
-          <span className="ml-2 hidden sm:inline" style={{ color: "rgba(255,255,255,0.15)" }}>
-            · Use ← → keys to navigate
-          </span>
+          {/* Tag chips — clickable links */}
+          {activeTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {activeTags.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/watch?category=${encodeURIComponent(tag)}&page=1`}
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)" }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+                >
+                  {categoryLabels[tag] ?? tag}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── Right: playlist ───────────────────────────────────────────── */}
       <div
         ref={listRef}
-        className="overflow-y-auto border-t lg:border-t-0 lg:border-l lg:w-80"
+        className="overflow-y-auto border-t lg:border-t-0 lg:border-l flex-shrink-0 lg:w-[380px] max-h-[50vh] lg:max-h-full"
         style={{
-          maxHeight: "50vh",
           borderColor: "rgba(255,255,255,0.08)",
           background: "#0d0505",
         }}
       >
         {/* Playlist header */}
-        <div className="sticky top-0 px-4 py-3 flex items-center justify-between z-10 border-b"
+        <div className="sticky top-0 px-5 py-3 flex items-center justify-between z-10 border-b"
              style={{ background: "#1a0a00", borderColor: "rgba(255,255,255,0.08)" }}>
           <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#D4AF37" }}>
             Playlist
@@ -187,12 +200,13 @@ export default function WatchPlayer({
 
         {songs.map((song, i) => {
           const isActive = i === activeIndex;
+          const songTags = song.category ? song.category.split(",").slice(0, 3) : [];
           return (
             <button
               key={song.id}
               ref={isActive ? activeItemRef : undefined}
               onClick={() => selectSong(i)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
+              className="w-full flex items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/5"
               style={{
                 background: isActive ? "rgba(212,175,55,0.10)" : "transparent",
                 borderLeft: isActive ? "3px solid #EF4832" : "3px solid transparent",
@@ -223,7 +237,7 @@ export default function WatchPlayer({
                 )}
               </div>
 
-              {/* Text */}
+              {/* Text + tag chips */}
               <div className="flex-1 min-w-0">
                 <p
                   className="text-xs font-medium leading-tight truncate"
@@ -234,6 +248,24 @@ export default function WatchPlayer({
                 <p className="text-xs truncate mt-0.5" style={{ color: isActive ? "#D4AF37" : "rgba(255,255,255,0.3)" }}>
                   {song.filmTitle}
                 </p>
+                {songTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {songTags.map((tag) => (
+                      <span
+                        key={tag}
+                        style={{
+                          fontSize: 9,
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          background: isActive ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
+                          color: isActive ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.3)",
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Track number */}
@@ -246,7 +278,7 @@ export default function WatchPlayer({
 
         {/* Pagination inside playlist */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 p-4 border-t"
+          <div className="flex items-center justify-center gap-3 p-5 border-t"
                style={{ borderColor: "rgba(255,255,255,0.08)" }}>
             {page > 1 && (
               <Link
