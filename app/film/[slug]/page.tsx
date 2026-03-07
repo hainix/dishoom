@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { notFound } from "next/navigation";
 import { getFilmBySlug, getReviewsForFilm, getSongsForFilm, getCastForFilm, getSimilarFilms } from "@/lib/db";
 import BadgeChip from "@/components/BadgeChip";

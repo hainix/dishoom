@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getTopFilms } from "@/lib/db";
 import BadgeChip from "@/components/BadgeChip";
 import Link from "next/link";

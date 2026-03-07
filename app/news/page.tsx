@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getLatestArticles, getSpotlightArticles } from "@/lib/db";
 import Link from "next/link";
 import type { Article } from "@/lib/db";

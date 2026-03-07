@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getSongsByCategory, getSongCategories } from "@/lib/db";
 import WatchPlayer from "@/components/WatchPlayer";
 import Link from "next/link";

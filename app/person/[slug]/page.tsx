@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { notFound } from "next/navigation";
 import { getPersonBySlug, getFilmographyForPerson } from "@/lib/db";
 import FilmCard from "@/components/FilmCard";

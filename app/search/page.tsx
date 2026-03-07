@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { searchFilms } from "@/lib/db";
 import FilmCard from "@/components/FilmCard";
 import Link from "next/link";

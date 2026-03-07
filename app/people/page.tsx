@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getCuratedPeople, getTopPeople } from "@/lib/db";
 import Link from "next/link";
 import type { Person } from "@/lib/db";
