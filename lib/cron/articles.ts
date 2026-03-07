@@ -73,6 +73,117 @@ function dayOfYear(date: Date): number {
   return Math.floor((date.getTime() - start.getTime()) / 86400000);
 }
 
+// ── Entity link injection ─────────────────────────────────────────────────────
+
+export interface EntityMaps {
+  films: Array<{ name: string; slug: string }>;
+  people: Array<{ name: string; slug: string }>;
+}
+
+// Common English/Hindi words that are also film titles — skip linking these
+const LINK_STOPWORDS = new Set([
+  "style", "game", "race", "force", "hero", "war", "love", "fire", "gold",
+  "king", "queen", "mother", "guide", "don", "luck", "ghost", "dream",
+  "dark", "storm", "rock", "rise", "fall", "run", "fly", "boss", "star",
+  "blade", "target", "trap", "test", "class", "form", "play", "action",
+  "murder", "gangster", "wanted", "soldier", "fighter", "blood", "justice",
+  "escape", "returns", "revenge", "moment", "saturday", "monday", "friday",
+]);
+
+/** Load film + person lookup tables from DB (notable entries only) */
+export function buildEntityMaps(): EntityMaps {
+  const db = getDb();
+  const allFilms = db.prepare(`
+    SELECT title as name, slug FROM films
+    WHERE rating >= 60 AND length(title) >= 6
+    ORDER BY rating DESC
+  `).all() as Array<{ name: string; slug: string }>;
+
+  // Filter out stopwords and deduplicate (keep highest-rated — first in ORDER BY rating DESC)
+  const seenFilm = new Set<string>();
+  const films = allFilms.filter((f) => {
+    const lo = f.name.toLowerCase();
+    if (LINK_STOPWORDS.has(lo) || seenFilm.has(lo)) return false;
+    seenFilm.add(lo);
+    return true;
+  });
+
+  const people = db.prepare(`
+    SELECT name, slug FROM people
+    WHERE length(name) >= 7
+    ORDER BY name
+  `).all() as Array<{ name: string; slug: string }>;
+
+  return { films, people };
+}
+
+const LINK_STYLE = "color:#D4AF37;text-decoration:none;border-bottom:1px solid rgba(212,175,55,0.35)";
+
+/**
+ * Scan HTML and auto-link first occurrence of each known film/person name.
+ * Skips text inside existing <a> tags, HTML tag attributes, and figure blocks.
+ *
+ * Matches are collected on the ORIGINAL text segment, then applied right-to-left
+ * so later replacements never corrupt earlier-inserted link attributes.
+ */
+export function linkifyHtml(html: string, maps: EntityMaps): string {
+  // Longest-first so "Shah Rukh Khan" matches before "Khan"
+  const entries: Array<{ text: string; href: string }> = [
+    ...maps.films.map((f) => ({ text: f.name, href: `/film/${f.slug}` })),
+    ...maps.people.map((p) => ({ text: p.name, href: `/person/${p.slug}` })),
+  ].sort((a, b) => b.text.length - a.text.length);
+
+  const linked = new Set<string>();
+  const segments = html.split(/(<[^>]*>)/);
+  let insideLink = 0;
+  let insideFigure = 0;
+
+  return segments.map((seg) => {
+    if (seg.startsWith("<")) {
+      if (/^<a[\s>]/i.test(seg)) insideLink++;
+      else if (/^<\/a>/i.test(seg)) insideLink = Math.max(0, insideLink - 1);
+      if (/^<figure[\s>]/i.test(seg)) insideFigure++;
+      else if (/^<\/figure>/i.test(seg)) insideFigure = Math.max(0, insideFigure - 1);
+      return seg;
+    }
+    if (insideLink > 0 || insideFigure > 0 || !seg.trim()) return seg;
+
+    // Collect non-overlapping matches on the ORIGINAL segment text
+    type SegMatch = { start: number; end: number; href: string; original: string };
+    const hits: SegMatch[] = [];
+
+    for (const entry of entries) {
+      const key = entry.text.toLowerCase();
+      if (linked.has(key)) continue;
+      const esc = entry.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`(?<![\\w\\-/])${esc}(?![\\w\\-])`, "i");
+      const m = re.exec(seg);
+      if (!m) continue;
+      const overlap = hits.some(
+        (h) => h.start < m.index + m[0].length && h.end > m.index
+      );
+      if (!overlap) {
+        hits.push({ start: m.index, end: m.index + m[0].length, href: entry.href, original: m[0] });
+        linked.add(key);
+      }
+    }
+
+    if (hits.length === 0) return seg;
+
+    // Apply right-to-left so earlier indices stay valid
+    hits.sort((a, b) => b.start - a.start);
+    let out = seg;
+    for (const h of hits) {
+      out = out.slice(0, h.start) +
+        `<a href="${h.href}" style="${LINK_STYLE}">${h.original}</a>` +
+        out.slice(h.end);
+    }
+    return out;
+  }).join("");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /** Wrap paragraphs in <p> tags with optional <figure> images interspersed */
 function buildHtml(paragraphs: string[], images: Array<{ src: string; caption?: string }>): string {
   const result: string[] = [];
@@ -358,7 +469,9 @@ Return JSON only, no markdown fences:
     }
   }
 
-  const thumbnail = dbFilms[0]?.posterSrc ?? null;
+  // Use a topic-derived index so each listicle gets a distinct thumbnail
+  const topicHash = topic.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const thumbnail = dbFilms[topicHash % dbFilms.length]?.posterSrc ?? null;
 
   return {
     title: parsed.title || topic,
@@ -469,6 +582,9 @@ export async function runArticlesCron(): Promise<void> {
     VALUES (@title, @slug, @description, @content, @thumbnail, @celebrity, 0)
   `);
 
+  // Build entity maps once — used to auto-link film/person names in all articles
+  const entityMaps = buildEntityMaps();
+
   let inserted = 0;
 
   function tryInsert(art: { title: string; slug: string; description: string; content: string; thumbnail: string | null; celebrity?: string | null }) {
@@ -476,7 +592,7 @@ export async function runArticlesCron(): Promise<void> {
       title: art.title,
       slug: art.slug,
       description: art.description,
-      content: art.content,
+      content: linkifyHtml(art.content, entityMaps),
       thumbnail: art.thumbnail,
       celebrity: art.celebrity ?? null,
     });

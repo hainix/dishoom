@@ -133,7 +133,7 @@ const CATEGORY_PILLS = [
 export default function HomePage() {
   const latestArticles = getLatestArticles(1, 10);
   const leadArticle = latestArticles[0] ?? null;
-  const newsGrid = latestArticles.slice(1, 4);
+  const newsGrid = latestArticles.slice(1, 5);
 
   const inTheaters = getFilmsByStatus('in_theaters', 4);
   const streaming = getFilmsByStatus('streaming', 8);
