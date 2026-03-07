@@ -23,8 +23,8 @@ export default function VideoPlayer({ youtubeId, title, filmTitle }: VideoPlayer
             title={title}
           />
         </div>
-        {filmTitle && <p className="text-xs text-gray-500 truncate">{filmTitle}</p>}
-        <p className="text-xs font-medium text-gray-800 truncate">{title}</p>
+        {filmTitle && <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{filmTitle}</p>}
+        <p className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>{title}</p>
       </div>
     );
   }
@@ -47,8 +47,8 @@ export default function VideoPlayer({ youtubeId, title, filmTitle }: VideoPlayer
           </div>
         </div>
       </div>
-      {filmTitle && <p className="text-xs text-gray-500 truncate">{filmTitle}</p>}
-      <p className="text-xs font-medium text-gray-800 truncate group-hover:text-dishoom-red transition-colors">{title}</p>
+      {filmTitle && <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{filmTitle}</p>}
+      <p className="text-xs font-medium truncate group-hover:text-dishoom-red transition-colors" style={{ color: 'rgba(255,255,255,0.9)' }}>{title}</p>
     </div>
   );
 }

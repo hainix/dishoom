@@ -11,10 +11,10 @@ function scoreColor(r: number | null) {
 }
 
 function scoreLabel(r: number | null) {
-  if (!r) return "NR";
-  if (r >= 60) return "Fresh";
-  if (r >= 50) return "Mixed";
-  return "Rotten";
+  if (r === null) return "NR";
+  if (r >= 60) return "Paisa Vasool";
+  if (r >= 50) return "Timepass";
+  return "Bakwaas";
 }
 
 function getPoster(film: Film) {

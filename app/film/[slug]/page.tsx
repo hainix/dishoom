@@ -18,10 +18,10 @@ function scoreColor(rating: number | null): string {
 }
 
 function scoreLabel(rating: number | null): string {
-  if (!rating) return "NR";
-  if (rating >= 60) return "Fresh";
-  if (rating >= 50) return "Mixed";
-  return "Rotten";
+  if (rating === null) return "NR";
+  if (rating >= 60) return "Paisa Vasool";
+  if (rating >= 50) return "Timepass";
+  return "Bakwaas";
 }
 
 const DIVIDER = "1px solid rgba(212,175,55,0.2)";

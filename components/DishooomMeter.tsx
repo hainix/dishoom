@@ -15,20 +15,20 @@ export default function DishooomMeter({ rating, size = 80 }: DishooomMeterProps)
   const circumference = 2 * Math.PI * r;
 
   const score = rating ?? 0;
-  const label = score >= 60 ? "Fresh" : score >= 50 ? "Mixed" : "Rotten";
-  const color = score >= 60 ? "#25E010" : score >= 50 ? "#D4AF37" : "#e32222";
+  const hasRating = rating !== null;
+  const label = !hasRating ? "Not Rated" : score >= 60 ? "Paisa Vasool" : score >= 50 ? "Timepass" : "Bakwaas";
+  const color = !hasRating ? "#666" : score >= 60 ? "#25E010" : score >= 50 ? "#D4AF37" : "#e32222";
 
   useEffect(() => {
     if (!circleRef.current) return;
-    const target = circumference - (score / 100) * circumference;
-    // Start fully offset (empty), then animate to target
+    // Unrated films: leave ring empty
+    const target = !hasRating ? circumference : circumference - (score / 100) * circumference;
     circleRef.current.style.transition = "none";
     circleRef.current.style.strokeDashoffset = String(circumference);
-    // Force reflow then animate
     void circleRef.current.getBoundingClientRect();
     circleRef.current.style.transition = "stroke-dashoffset 1s ease-out";
     circleRef.current.style.strokeDashoffset = String(target);
-  }, [score, circumference]);
+  }, [score, hasRating, circumference]);
 
   return (
     <div className="flex flex-col items-center gap-1" style={{ width: size }}>
