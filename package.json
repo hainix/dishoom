@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "bash start.sh",
     "seed": "tsx prisma/seed.ts",
     "db:seed": "tsx prisma/seed.ts"
   },
