@@ -1,0 +1,121 @@
+// Dishoom - Bollywood Rotten Tomatoes
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Film {
+  id              Int       @id @default(autoincrement())
+  oldId           Int?      @unique @map("old_id")
+  title           String
+  year            Int?
+  slug            String    @unique
+  rating          Float?    // 0-100 percentage
+  votes           Int?      @default(0)
+  stars           Float?    // 0-5 stars
+  summary         String?
+  plot            String?
+  storyline       String?
+  oneliner        String?
+  posterSrc       String?   @map("poster_src")
+  trailer         String?
+  writers         String?
+  musicDirectors  String?   @map("music_directors")
+  wikiHandle      String?   @map("wiki_handle")
+  badges          String?
+  status          String?   @default("library") // in_theaters | coming_soon | library
+  releaseDate     String?   @map("release_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  reviews         Review[]
+  filmPeople      FilmPerson[]
+  songs           Song[]
+  articles        Article[]
+
+  @@map("films")
+}
+
+model Person {
+  id          Int          @id @default(autoincrement())
+  oldId       Int?         @unique @map("old_id")
+  name        String
+  slug        String       @unique
+  bio         String?
+  imageUrl    String?      @map("image_url")
+  birthdate   String?
+  birthplace  String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  filmPeople  FilmPerson[]
+
+  @@map("people")
+}
+
+model FilmPerson {
+  id        Int     @id @default(autoincrement())
+  filmId    Int     @map("film_id")
+  personId  Int     @map("person_id")
+  role      String  // actor | director | writer | music_director
+  character String?
+
+  film      Film    @relation(fields: [filmId], references: [id])
+  person    Person  @relation(fields: [personId], references: [id])
+
+  @@unique([filmId, personId, role])
+  @@map("film_people")
+}
+
+model Review {
+  id          Int       @id @default(autoincrement())
+  oldId       Int?      @unique @map("old_id")
+  filmId      Int       @map("film_id")
+  reviewer    String?
+  reviewerId  Int?      @map("reviewer_id")
+  sourceName  String?   @map("source_name")
+  sourceLink  String?   @map("source_link")
+  rating      Float?    // individual critic rating
+  excerpt     String?
+  article     String?
+  imgSrc      String?   @map("img_src")
+  date        DateTime? @default(now())
+
+  film        Film      @relation(fields: [filmId], references: [id])
+
+  @@map("reviews")
+}
+
+model Article {
+  id          Int       @id @default(autoincrement())
+  title       String
+  slug        String    @unique
+  description String?
+  thumbnail   String?
+  content     String?
+  filmId      Int?      @map("film_id")
+  celebrity   String?
+  isSpotlight Boolean   @default(false) @map("is_spotlight")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  film        Film?     @relation(fields: [filmId], references: [id])
+
+  @@map("articles")
+}
+
+model Song {
+  id          Int     @id @default(autoincrement())
+  oldId       Int?    @unique @map("old_id")
+  filmId      Int     @map("film_id")
+  title       String?
+  youtubeId   String? @map("youtube_id")
+  lyrics      String?
+
+  film        Film    @relation(fields: [filmId], references: [id])
+
+  @@map("songs")
+}
