@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# SQLite WAL/SHM journal files (transient, local-only)
+prisma/*.db-shm
+prisma/*.db-wal
