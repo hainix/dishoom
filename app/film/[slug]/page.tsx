@@ -325,7 +325,7 @@ export default async function FilmPage({ params }: FilmPageProps) {
         <section style={{ borderTop: DIVIDER }}>
           <div style={SECTION_PAD}>
             <SectionHeading>Trailer</SectionHeading>
-            <div className="relative rounded-lg overflow-hidden" style={{ maxWidth: 640, paddingBottom: "56.25%", height: 0 }}>
+            <div className="relative rounded-lg overflow-hidden" style={{ paddingBottom: "56.25%", height: 0 }}>
               <iframe
                 src={`https://www.youtube.com/embed/${film.trailer}`}
                 className="absolute inset-0 w-full h-full"
