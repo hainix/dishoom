@@ -1,17 +1,24 @@
 /**
  * Articles cron: generates ~10 Bollywood articles per day via Claude.
- * - 7 film-specific news articles (recent TMDB releases)
- * - 3 rotating top-list articles
  *
- * Can also be run directly:
+ * Article types (run each day):
+ *  - Film news       (4-5): recent TMDB releases, 2-3 backdrop images interspersed
+ *  - Star spotlight  (2):   from DB people, TMDB person images
+ *  - Listicle        (2):   rotating TOPICS, film posters per list item
+ *  - Classic retro   (1):   anniversary/featured classic from DB with backdrop + poster
+ *
+ * Run directly:
  *   npx tsx -e "import('./lib/cron/articles').then(m => m.runArticlesCron())"
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { getDb } from "../db";
 
 const TMDB_KEY = process.env.TMDB_API_KEY ?? "f8a0148b386a3f00558c847eb9e4284f";
-const IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
+const BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280";
+const POSTER_BASE = "https://image.tmdb.org/t/p/w500";
+const PERSON_IMG_BASE = "https://image.tmdb.org/t/p/w780";
 
+// ── Listicle topics (cycled daily) ──────────────────────────────────────────
 const TOPICS = [
   "Top 10 Bollywood films of the 1990s you need to watch",
   "Best Bollywood villains of all time",
@@ -36,7 +43,21 @@ const TOPICS = [
   "Best Bollywood horror films of all time",
   "Top 10 Bollywood biopics",
   "Greatest Bollywood action heroes ranked",
+  "10 Bollywood films every non-Bollywood fan should start with",
+  "Best Bollywood ensemble cast films of all time",
 ];
+
+// ── Star spotlight subjects (cycled daily) ───────────────────────────────────
+const SPOTLIGHT_STARS = [
+  "Shah Rukh Khan", "Amitabh Bachchan", "Madhuri Dixit", "Sridevi",
+  "Hrithik Roshan", "Deepika Padukone", "Aamir Khan", "Salman Khan",
+  "Kareena Kapoor Khan", "Rekha", "Dilip Kumar", "Rajesh Khanna",
+  "Priyanka Chopra Jonas", "Aishwarya Rai Bachchan", "Ranveer Singh",
+  "Akshay Kumar", "Katrina Kaif", "Ranbir Kapoor", "Vidya Balan",
+  "Nawazuddin Siddiqui",
+];
+
+// ────────────────────────────────────────────────────────────────────────────
 
 function slugify(text: string): string {
   return text
@@ -52,14 +73,42 @@ function dayOfYear(date: Date): number {
   return Math.floor((date.getTime() - start.getTime()) / 86400000);
 }
 
+/** Wrap paragraphs in <p> tags with optional <figure> images interspersed */
+function buildHtml(paragraphs: string[], images: Array<{ src: string; caption?: string }>): string {
+  const result: string[] = [];
+  let imgIdx = 0;
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    result.push(`<p>${paragraphs[i]}</p>`);
+
+    // Insert an image after paragraphs 1 and 3 (0-indexed) if available
+    if ((i === 1 || i === 3) && imgIdx < images.length) {
+      const img = images[imgIdx++];
+      const cap = img.caption ? `<figcaption>${img.caption}</figcaption>` : "";
+      result.push(`<figure><img src="${img.src}" alt="${img.caption ?? ""}" loading="lazy" />${cap}</figure>`);
+    }
+  }
+
+  // Append any remaining images at the end
+  while (imgIdx < images.length) {
+    const img = images[imgIdx++];
+    const cap = img.caption ? `<figcaption>${img.caption}</figcaption>` : "";
+    result.push(`<figure><img src="${img.src}" alt="${img.caption ?? ""}" loading="lazy" />${cap}</figure>`);
+  }
+
+  return result.join("\n");
+}
+
+// ── TMDB helpers ─────────────────────────────────────────────────────────────
+
 interface TMDBMovie {
   id: number;
   title: string;
   overview: string;
   release_date: string;
   poster_path: string | null;
+  backdrop_path: string | null;
   vote_average: number;
-  genre_ids: number[];
 }
 
 interface TMDBCredits {
@@ -67,52 +116,75 @@ interface TMDBCredits {
   cast: Array<{ name: string; order: number }>;
 }
 
+interface TMDBImages {
+  backdrops: Array<{ file_path: string; vote_average: number }>;
+  posters: Array<{ file_path: string; vote_average: number }>;
+  profiles?: Array<{ file_path: string; vote_average: number }>;
+}
+
+async function tmdbGet<T>(path: string, extra?: Record<string, string>): Promise<T | null> {
+  const params = new URLSearchParams({ api_key: TMDB_KEY, ...extra });
+  const res = await fetch(`https://api.themoviedb.org/3${path}?${params}`);
+  if (!res.ok) return null;
+  return res.json() as Promise<T>;
+}
+
 async function fetchRecentFilms(): Promise<TMDBMovie[]> {
-  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
-  const params = new URLSearchParams({
-    api_key: TMDB_KEY,
+  const data = await tmdbGet<{ results: TMDBMovie[] }>("/discover/movie", {
     with_original_language: "hi",
     sort_by: "release_date.desc",
     "primary_release_date.gte": fourteenDaysAgo,
     "primary_release_date.lte": today,
     "vote_count.gte": "5",
   });
-  const res = await fetch(`https://api.themoviedb.org/3/discover/movie?${params}`);
-  if (!res.ok) return [];
-  const data = (await res.json()) as { results: TMDBMovie[] };
-  return data.results.slice(0, 7);
+  return data?.results.slice(0, 5) ?? [];
+}
+
+async function fetchFilmImages(tmdbId: number): Promise<TMDBImages> {
+  const data = await tmdbGet<TMDBImages>(`/movie/${tmdbId}/images`);
+  return data ?? { backdrops: [], posters: [] };
+}
+
+async function fetchPersonTmdbId(name: string): Promise<number | null> {
+  const data = await tmdbGet<{ results: Array<{ id: number; name: string }> }>("/search/person", { query: name });
+  return data?.results[0]?.id ?? null;
+}
+
+async function fetchPersonImages(personId: number): Promise<string[]> {
+  const data = await tmdbGet<{ profiles: Array<{ file_path: string }> }>(`/person/${personId}/images`);
+  return (data?.profiles ?? []).slice(0, 3).map((p) => `${PERSON_IMG_BASE}${p.file_path}`);
 }
 
 async function fetchCredits(tmdbId: number): Promise<TMDBCredits> {
-  const res = await fetch(
-    `https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${TMDB_KEY}`
-  );
-  if (!res.ok) return { crew: [], cast: [] };
-  return res.json();
+  const data = await tmdbGet<TMDBCredits>(`/movie/${tmdbId}/credits`);
+  return data ?? { crew: [], cast: [] };
 }
 
-async function generateFilmArticle(
+// ── Article generators ────────────────────────────────────────────────────────
+
+async function generateFilmNewsArticle(
   client: Anthropic,
   movie: TMDBMovie,
-  credits: TMDBCredits,
   dateStr: string
-): Promise<{
-  title: string;
-  slug: string;
-  description: string;
-  content: string;
-  celebrity: string | null;
-}> {
+): Promise<{ title: string; slug: string; description: string; content: string; thumbnail: string | null; celebrity: string | null } | null> {
+  const credits = await fetchCredits(movie.id);
   const director = credits.crew.find((c) => c.job === "Director")?.name ?? null;
-  const topCast = credits.cast
-    .slice(0, 3)
-    .map((c) => c.name)
-    .join(", ");
+  const topCast = credits.cast.slice(0, 4).map((c) => c.name).join(", ");
 
-  const prompt = `Write a 3-paragraph Bollywood news article about the film "${movie.title}" (${movie.release_date?.slice(0, 4) ?? "recent"}).
+  // Fetch backdrops for interspersing in article
+  const imgs = await fetchFilmImages(movie.id);
+  const backdrops = imgs.backdrops
+    .sort((a, b) => b.vote_average - a.vote_average)
+    .slice(0, 3)
+    .map((b) => ({ src: `${BACKDROP_BASE}${b.file_path}`, caption: movie.title }));
+  // Fallback to movie.backdrop_path if no backdrops returned
+  if (backdrops.length === 0 && movie.backdrop_path) {
+    backdrops.push({ src: `${BACKDROP_BASE}${movie.backdrop_path}`, caption: movie.title });
+  }
+
+  const prompt = `Write a punchy 5-paragraph Bollywood film review/news article about "${movie.title}" (${movie.release_date?.slice(0, 4) ?? "recent"}).
 
 Film details:
 - Overview: ${movie.overview || "A new Bollywood release"}
@@ -120,76 +192,252 @@ Film details:
 - Cast: ${topCast || "Ensemble cast"}
 - TMDB score: ${movie.vote_average.toFixed(1)}/10
 
-Paragraph 1: Introduction and what the film is about
-Paragraph 2: Critical reception and standout elements
-Paragraph 3: Cultural impact and recommendation
+Write exactly 5 paragraphs (no headings), each 3-5 sentences. Cover:
+P1: Compelling opening hook about the film and what makes it notable
+P2: Plot overview and setup (spoiler-free)
+P3: Standout performances and direction
+P4: Music, cinematography, or other technical highlights
+P5: Verdict and who should watch it
 
 Also provide:
-- title: punchy article headline (max 80 chars)
-- description: one sentence summary (max 150 chars)
+- title: punchy headline (max 85 chars, no quotes)
+- description: one crisp sentence (max 150 chars)
 
-Respond with JSON only:
-{"title":"...","description":"...","content":"<p>...</p><p>...</p><p>...</p>"}`;
+Return JSON only (no markdown fences):
+{"title":"...","description":"...","paragraphs":["P1 text","P2 text","P3 text","P4 text","P5 text"]}`;
 
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 800,
+    max_tokens: 1000,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON in response");
-  const parsed = JSON.parse(jsonMatch[0]) as { title: string; description: string; content: string };
+  const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+  const clean = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/, "");
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  let parsed: { title: string; description: string; paragraphs: string[] };
+  try { parsed = JSON.parse(jsonMatch[0]); } catch { return null; }
+
+  const content = buildHtml(parsed.paragraphs ?? [], backdrops);
+  const thumbnail = movie.poster_path ? `${POSTER_BASE}${movie.poster_path}` : null;
 
   return {
     title: parsed.title,
     slug: `${slugify(movie.title)}-${dateStr}`,
     description: parsed.description,
-    content: parsed.content,
+    content,
+    thumbnail,
     celebrity: director ?? (credits.cast[0]?.name ?? null),
   };
 }
 
-async function generateTopListArticle(
+async function generateStarSpotlight(
   client: Anthropic,
-  topic: string,
+  starName: string,
   dateStr: string
-): Promise<{
-  title: string;
-  slug: string;
-  description: string;
-  content: string;
-}> {
-  const prompt = `Write a 400-word Bollywood listicle article with the topic: "${topic}"
+): Promise<{ title: string; slug: string; description: string; content: string; thumbnail: string | null; celebrity: string } | null> {
+  const personId = await fetchPersonTmdbId(starName);
+  const personImages = personId ? await fetchPersonImages(personId) : [];
+  const images = personImages.map((src) => ({ src, caption: starName }));
 
-Include:
-- A numbered list of 10 items with brief (2-3 sentence) descriptions for each
-- An introductory paragraph
+  const prompt = `Write a rich 5-paragraph star profile / retrospective about Bollywood star "${starName}" for Dishoom Films, a Bollywood review site.
 
-Also provide a one-sentence description (max 150 chars).
+Write exactly 5 paragraphs (no headings), each 3-5 sentences. Cover:
+P1: Opening hook — who they are and their cultural significance
+P2: Early career and breakthrough moment
+P3: Defining films and iconic roles
+P4: Their impact on Bollywood and fans
+P5: Legacy and what makes them timeless
 
-Respond with JSON only:
-{"title":"${topic}","description":"...","content":"<p>...</p><ol><li>...</li>...</ol>"}`;
+Also provide:
+- title: compelling headline with the star's name (max 85 chars, no quotes)
+- description: one memorable sentence (max 150 chars)
+
+Return JSON only (no markdown fences):
+{"title":"...","description":"...","paragraphs":["P1","P2","P3","P4","P5"]}`;
 
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 1200,
+    max_tokens: 1000,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON in response");
-  const parsed = JSON.parse(jsonMatch[0]) as { title: string; description: string; content: string };
+  const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+  const clean = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/, "");
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  let parsed: { title: string; description: string; paragraphs: string[] };
+  try { parsed = JSON.parse(jsonMatch[0]); } catch { return null; }
+
+  const content = buildHtml(parsed.paragraphs ?? [], images);
+  const thumbnail = images[0]?.src ?? null;
+
+  return {
+    title: parsed.title,
+    slug: `${slugify(starName)}-spotlight-${dateStr}`,
+    description: parsed.description,
+    content,
+    thumbnail,
+    celebrity: starName,
+  };
+}
+
+async function generateListicle(
+  client: Anthropic,
+  topic: string,
+  dateStr: string
+): Promise<{ title: string; slug: string; description: string; content: string; thumbnail: string | null } | null> {
+  // Fetch posters for films matching the topic from DB
+  const db = getDb();
+  type PosterRow = { title: string; posterSrc: string | null; year: number | null };
+  const dbFilms = db.prepare(
+    `SELECT title, poster_src as posterSrc, year FROM films
+     WHERE poster_src IS NOT NULL AND rating IS NOT NULL
+     ORDER BY rating DESC LIMIT 15`
+  ).all() as PosterRow[];
+
+  const prompt = `Write a Bollywood listicle article for Dishoom Films about: "${topic}"
+
+Write an introductory paragraph (3-4 sentences), then a numbered list of exactly 10 items.
+For each item write: <strong>[Film/Name]</strong> — 2-3 sentence description.
+Do NOT use <ol> or <li> tags — write each as plain text like:
+1. <strong>Film Title</strong> — Description here.
+2. <strong>Film Title</strong> — Description here.
+...
+
+Also provide:
+- title: the topic as a punchy headline (max 85 chars)
+- description: one sentence (max 150 chars)
+
+Return JSON only (no markdown fences):
+{"title":"...","description":"...","intro":"intro paragraph text","items":["1. <strong>...</strong> — ...","2. ...","..."]}`;
+
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1400,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+  const clean = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/, "");
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  let parsed: { title: string; description: string; intro: string; items: string[] };
+  try { parsed = JSON.parse(jsonMatch[0]); } catch { return null; }
+
+  // Build HTML: intro paragraph, then items with poster images interspersed every 3
+  const parts: string[] = [`<p>${parsed.intro}</p>`];
+  const items = parsed.items ?? [];
+  for (let i = 0; i < items.length; i++) {
+    parts.push(`<p>${items[i]}</p>`);
+    // Intersperse a random DB poster every 3 items
+    if ((i + 1) % 3 === 0 && dbFilms.length > 0) {
+      const film = dbFilms[(i / 3) % dbFilms.length];
+      if (film?.posterSrc) {
+        parts.push(`<figure><img src="${film.posterSrc}" alt="${film.title}" loading="lazy" /><figcaption>${film.title}${film.year ? ` (${film.year})` : ""}</figcaption></figure>`);
+      }
+    }
+  }
+
+  const thumbnail = dbFilms[0]?.posterSrc ?? null;
 
   return {
     title: parsed.title || topic,
     slug: `${slugify(topic)}-${dateStr}`,
     description: parsed.description,
-    content: parsed.content,
+    content: parts.join("\n"),
+    thumbnail,
   };
 }
+
+async function generateClassicRetro(
+  client: Anthropic,
+  dateStr: string
+): Promise<{ title: string; slug: string; description: string; content: string; thumbnail: string | null; celebrity: string | null } | null> {
+  const db = getDb();
+
+  type ClassicFilm = { id: number; title: string; year: number | null; slug: string; rating: number | null; posterSrc: string | null; backdropSrc: string | null; plot: string | null; stars: string | null; tmdbId: number | null };
+
+  // Pick a random high-rated classic (1970-2005) that has a backdrop
+  const film = db.prepare(
+    `SELECT id, title, year, slug, rating, poster_src as posterSrc, backdrop_src as backdropSrc,
+            plot, stars, tmdb_id as tmdbId
+     FROM films
+     WHERE rating >= 70 AND year BETWEEN 1970 AND 2005
+       AND backdrop_src IS NOT NULL AND poster_src IS NOT NULL
+       AND (plot IS NOT NULL AND plot != '')
+     ORDER BY RANDOM() LIMIT 1`
+  ).get() as ClassicFilm | undefined;
+
+  if (!film) return null;
+
+  // Collect images: backdrop first, then poster
+  const images: Array<{ src: string; caption: string }> = [];
+  if (film.backdropSrc) images.push({ src: film.backdropSrc, caption: film.title });
+  if (film.posterSrc && film.posterSrc !== film.backdropSrc) images.push({ src: film.posterSrc, caption: `${film.title}${film.year ? ` (${film.year})` : ""}` });
+
+  // Optionally fetch more backdrops from TMDB
+  if (film.tmdbId) {
+    const tmdbImgs = await fetchFilmImages(film.tmdbId);
+    const extra = tmdbImgs.backdrops
+      .sort((a, b) => b.vote_average - a.vote_average)
+      .slice(0, 1)
+      .map((b) => ({ src: `${BACKDROP_BASE}${b.file_path}`, caption: film.title }));
+    images.push(...extra);
+  }
+
+  const prompt = `Write a passionate 5-paragraph retrospective about the classic Bollywood film "${film.title}" (${film.year ?? "classic era"}) for Dishoom Films.
+
+Film details:
+- Plot: ${film.plot ?? "A landmark of Indian cinema"}
+- Stars: ${film.stars ?? "Iconic cast"}
+- Dishoom rating: ${film.rating ?? "N/A"}/100
+
+Write exactly 5 paragraphs (no headings), each 3-5 sentences. Cover:
+P1: Opening hook — why this film matters and its place in Bollywood history
+P2: Plot and narrative craft (spoiler-light)
+P3: Performances that became iconic
+P4: Music, songs, and visual style
+P5: Why it endures and who needs to watch it today
+
+Also provide:
+- title: retrospective headline with the film name (max 85 chars, no quotes)
+- description: one evocative sentence (max 150 chars)
+
+Return JSON only (no markdown fences):
+{"title":"...","description":"...","paragraphs":["P1","P2","P3","P4","P5"]}`;
+
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1000,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const raw = message.content[0].type === "text" ? message.content[0].text : "{}";
+  const clean = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/, "");
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
+  let parsed: { title: string; description: string; paragraphs: string[] };
+  try { parsed = JSON.parse(jsonMatch[0]); } catch { return null; }
+
+  const content = buildHtml(parsed.paragraphs ?? [], images);
+
+  return {
+    title: parsed.title,
+    slug: `retro-${slugify(film.title)}-${dateStr}`,
+    description: parsed.description,
+    content,
+    thumbnail: film.backdropSrc ?? film.posterSrc,
+    celebrity: film.stars?.split(",")[0]?.trim() ?? null,
+  };
+}
+
+// ── Main cron ────────────────────────────────────────────────────────────────
 
 export async function runArticlesCron(): Promise<void> {
   const db = getDb();
@@ -206,63 +454,94 @@ export async function runArticlesCron(): Promise<void> {
 
   let inserted = 0;
 
-  // ── Film news articles ─────────────────────────────────────────────────────
-  const films = await fetchRecentFilms();
-  for (const movie of films) {
-    // Skip if we already wrote an article about this film today
-    const slugCheck = `${slugify(movie.title)}-${dateStr}`;
-    const exists = db.prepare("SELECT id FROM articles WHERE slug = ?").get(slugCheck);
-    if (exists) continue;
-
-    try {
-      const credits = await fetchCredits(movie.id);
-      const article = await generateFilmArticle(client, movie, credits, dateStr);
-      const result = insertArticle.run({
-        title: article.title,
-        slug: article.slug,
-        description: article.description,
-        content: article.content,
-        thumbnail: movie.poster_path ? `${IMAGE_BASE}${movie.poster_path}` : null,
-        celebrity: article.celebrity,
-      });
-      if (result.changes > 0) inserted++;
-    } catch (err) {
-      console.error(`[cron:articles] failed for "${movie.title}":`, err);
-    }
-
-    await new Promise((r) => setTimeout(r, 500));
+  function tryInsert(art: { title: string; slug: string; description: string; content: string; thumbnail: string | null; celebrity?: string | null }) {
+    const result = insertArticle.run({
+      title: art.title,
+      slug: art.slug,
+      description: art.description,
+      content: art.content,
+      thumbnail: art.thumbnail,
+      celebrity: art.celebrity ?? null,
+    });
+    if (result.changes > 0) inserted++;
   }
 
-  // ── Top-list articles ──────────────────────────────────────────────────────
-  const topicStart = (doy * 3) % TOPICS.length;
+  function alreadyExists(slug: string): boolean {
+    return !!db.prepare("SELECT id FROM articles WHERE slug = ?").get(slug);
+  }
+
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // ── 1. Film news articles (up to 5) ────────────────────────────────────────
+  console.log("[cron:articles] Fetching recent films...");
+  const films = await fetchRecentFilms();
+  for (const movie of films) {
+    const slug = `${slugify(movie.title)}-${dateStr}`;
+    if (alreadyExists(slug)) continue;
+    try {
+      const art = await generateFilmNewsArticle(client, movie, dateStr);
+      if (art) tryInsert(art);
+      console.log(`[cron:articles] film news: ${movie.title}`);
+    } catch (err) {
+      console.error(`[cron:articles] film news failed for "${movie.title}":`, err);
+    }
+    await delay(600);
+  }
+
+  // ── 2. Star spotlights (2 per day) ─────────────────────────────────────────
+  const starStart = (doy * 2) % SPOTLIGHT_STARS.length;
+  const todayStars = [
+    SPOTLIGHT_STARS[starStart % SPOTLIGHT_STARS.length],
+    SPOTLIGHT_STARS[(starStart + 1) % SPOTLIGHT_STARS.length],
+  ];
+
+  for (const star of todayStars) {
+    const slug = `${slugify(star)}-spotlight-${dateStr}`;
+    if (alreadyExists(slug)) continue;
+    try {
+      const art = await generateStarSpotlight(client, star, dateStr);
+      if (art) tryInsert(art);
+      console.log(`[cron:articles] star spotlight: ${star}`);
+    } catch (err) {
+      console.error(`[cron:articles] spotlight failed for "${star}":`, err);
+    }
+    await delay(600);
+  }
+
+  // ── 3. Listicles (2 per day) ────────────────────────────────────────────────
+  const topicStart = (doy * 2) % TOPICS.length;
   const todayTopics = [
     TOPICS[topicStart % TOPICS.length],
     TOPICS[(topicStart + 1) % TOPICS.length],
-    TOPICS[(topicStart + 2) % TOPICS.length],
   ];
 
   for (const topic of todayTopics) {
-    const slugCheck = `${slugify(topic)}-${dateStr}`;
-    const exists = db.prepare("SELECT id FROM articles WHERE slug = ?").get(slugCheck);
-    if (exists) continue;
-
+    const slug = `${slugify(topic)}-${dateStr}`;
+    if (alreadyExists(slug)) continue;
     try {
-      const article = await generateTopListArticle(client, topic, dateStr);
-      const result = insertArticle.run({
-        title: article.title,
-        slug: article.slug,
-        description: article.description,
-        content: article.content,
-        thumbnail: null,
-        celebrity: null,
-      });
-      if (result.changes > 0) inserted++;
+      const art = await generateListicle(client, topic, dateStr);
+      if (art) tryInsert({ ...art, celebrity: null });
+      console.log(`[cron:articles] listicle: ${topic}`);
     } catch (err) {
-      console.error(`[cron:articles] top-list failed for "${topic}":`, err);
+      console.error(`[cron:articles] listicle failed for "${topic}":`, err);
     }
-
-    await new Promise((r) => setTimeout(r, 500));
+    await delay(600);
   }
 
-  console.log(`[cron:articles] ${inserted} articles inserted`);
+  // ── 4. Classic retrospective (1 per day) ───────────────────────────────────
+  const retroSlug = `retro-classic-${dateStr}`;
+  // We can't easily pre-check since the film is random — just try and let INSERT OR IGNORE handle duplication via slug
+  const existsRetro = db.prepare("SELECT id FROM articles WHERE slug LIKE ?").get(`retro-%-${dateStr}`);
+  if (!existsRetro) {
+    try {
+      const art = await generateClassicRetro(client, dateStr);
+      if (art) tryInsert(art);
+      if (art) console.log(`[cron:articles] classic retro: ${art.title}`);
+    } catch (err) {
+      console.error("[cron:articles] classic retro failed:", err);
+    }
+  }
+
+  console.log(`[cron:articles] Done — ${inserted} articles inserted`);
+  void retroSlug; // suppress unused var warning
 }

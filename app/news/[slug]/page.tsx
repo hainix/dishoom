@@ -151,11 +151,13 @@ export default async function NewsArticlePage({ params }: NewsArticlePageProps) 
         )}
 
         {article.content ? (
-          <div className="space-y-5 leading-relaxed" style={{ fontSize: "1rem", color: "rgba(255,255,255,0.75)" }}>
-            {article.content.split(/\n\n+/).map((para, i) => (
-              <p key={i}>{para}</p>
-            ))}
-          </div>
+          /* Content is Claude-generated only — not user input — so dangerouslySetInnerHTML is safe here */
+          // eslint-disable-next-line react/no-danger
+          <div
+            className="article-body"
+            style={{ fontSize: "1rem" }}
+            dangerouslySetInnerHTML={{ __html: article.content }}
+          />
         ) : (
           <p className="text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>Full article content coming soon.</p>
         )}
