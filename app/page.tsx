@@ -199,7 +199,7 @@ export default function HomePage() {
                     More Stories
                   </h2>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {newsGrid.map((article) => (
                     <Link key={article.id} href={`/news/${article.slug}`} className="block group">
                       {article.thumbnail ? (
@@ -251,7 +251,7 @@ export default function HomePage() {
                     Browse all →
                   </Link>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {featuredSongs.map((song) => (
                     <VideoPlayer
                       key={song.id}
@@ -275,7 +275,7 @@ export default function HomePage() {
           </div>
 
           {/* RIGHT RAIL */}
-          <aside style={{ flex: '0 0 340px', width: 340 }}>
+          <aside className="w-full lg:w-[340px] lg:flex-none">
             {inTheaters.length > 0 && (
               <RailSection icon="🎬" label="In Cinemas" href="/films?status=in_theaters">
                 {inTheaters.map((film) => (

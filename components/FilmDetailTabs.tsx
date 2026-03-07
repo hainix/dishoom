@@ -21,7 +21,7 @@ export default function FilmDetailTabs({ tabs, dark }: FilmDetailTabsProps) {
 
   return (
     <div>
-      <nav className="flex mt-6" style={{ borderBottom: `1px solid ${borderColor}` }}>
+      <nav className="flex mt-6 overflow-x-auto" style={{ borderBottom: `1px solid ${borderColor}`, scrollbarWidth: "none" }}>
         {tabs.map((tab) => {
           const isActive = active === tab.id;
           return (
@@ -36,6 +36,7 @@ export default function FilmDetailTabs({ tabs, dark }: FilmDetailTabsProps) {
                 background: "transparent",
                 cursor: "pointer",
                 letterSpacing: "0.06em",
+                flexShrink: 0,
               }}
             >
               {tab.label}

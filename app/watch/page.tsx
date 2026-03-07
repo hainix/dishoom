@@ -119,8 +119,6 @@ export default async function WatchPage({ searchParams }: WatchPageProps) {
   return (
     <div
       style={{
-        width: "100vw",
-        marginLeft: "calc(50% - 50vw)",
         minHeight: "calc(100vh - 85px)",
         background: "#0d0505",
         display: "flex",
@@ -128,7 +126,7 @@ export default async function WatchPage({ searchParams }: WatchPageProps) {
       }}
     >
       {/* Three-column layout */}
-      <div className="flex flex-1" style={{ minHeight: 0, height: "calc(100vh - 85px)" }}>
+      <div className="flex flex-1" style={{ minHeight: 0 }}>
 
         {/* ── Desktop sidebar ───────────────────────────────────────────── */}
         <aside

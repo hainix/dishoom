@@ -5,11 +5,11 @@ import type { Article } from "@/lib/db";
 
 export default function SpotlightGrid({ articles }: { articles: Article[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {articles.map((article) => (
         <div key={article.id} className="group">
           <Link href={`/news/${article.slug}`}>
-            <div className="w-full mb-2 overflow-hidden" style={{ height: 100, background: "rgba(255,255,255,0.08)" }}>
+            <div className="w-full mb-2 overflow-hidden" style={{ aspectRatio: "16/9", height: "auto", background: "rgba(255,255,255,0.08)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={article.thumbnail || `https://placehold.co/200x100/EF4832/ffffff?text=${encodeURIComponent(article.title.slice(0, 12))}`}
