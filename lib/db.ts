@@ -344,7 +344,7 @@ export function getLatestArticles(page = 1, limit = 15): Article[] {
     .prepare(
       `SELECT ${ARTICLE_SELECT} FROM articles a
        LEFT JOIN films f ON a.film_id = f.id
-       ORDER BY a.created_at DESC LIMIT ? OFFSET ?`
+       ORDER BY a.id DESC LIMIT ? OFFSET ?`
     )
     .all(limit, offset) as Article[];
 }
@@ -356,7 +356,7 @@ export function getSpotlightArticles(page = 1, limit = 12): Article[] {
       `SELECT ${ARTICLE_SELECT} FROM articles a
        LEFT JOIN films f ON a.film_id = f.id
        WHERE a.is_spotlight = 1
-       ORDER BY a.created_at DESC LIMIT ? OFFSET ?`
+       ORDER BY a.id DESC LIMIT ? OFFSET ?`
     )
     .all(limit, offset) as Article[];
 }
