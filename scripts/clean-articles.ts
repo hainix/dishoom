@@ -17,6 +17,8 @@ const db = new Database(path.resolve(process.cwd(), "prisma/dev.db"));
 
 /** Convert old <br/>/<br>-separated plain text into <p> HTML */
 function brTextToHtml(text: string): string {
+  // Already HTML — don't re-wrap
+  if (/<p[\s>]/i.test(text)) return text;
   // Normalise <br /> variants then split on double-br
   const normalized = text
     .replace(/<br\s*\/?\s*>/gi, "\n")
@@ -101,7 +103,7 @@ async function main() {
       // ── Content conversion ─────────────────────────────────────────────────
       let newContent: string;
       if (isOld) {
-        newContent = brTextToHtml(art.content);
+        newContent = brTextToHtml(art.content.replace(/\\'/g, "'"));
       } else {
         newContent = plainTextToHtml(art.content);
       }
