@@ -1,65 +1,72 @@
 /**
- * Imports recent Bollywood films (2012–2025) from TMDB.
- * Uses /discover/movie filtered to Hindi-language films, sorted by popularity.
- * Fetches up to 20 pages (~400 films), inserting only those not already in the DB.
- * Generates one-liners via Claude for each new film in the Dishoom editorial voice.
+ * Imports recent Bollywood films (2012–2025) from TMDB with complete profiles.
+ *
+ * For each new film, in a single pass:
+ *   1. TMDB details (credits + videos) — cast, crew, trailer YouTube ID, backdrop
+ *   2. Claude — one-liner, vibe badges, known song titles + tags
+ *   3. YouTube API — video IDs for each Claude-identified song
+ *
+ * Populates: films, film_people (cast/crew), songs
+ *
+ * Keys (set in .env.local or environment):
+ *   ANTHROPIC_API_KEY — required for one-liners, badges, songs
+ *   YOUTUBE_API_KEY   — optional; unfound songs filled later by fetch-youtube-ids.ts
  *
  * Usage:
  *   npx tsx scripts/import-recent-films.ts
- *   npx tsx scripts/import-recent-films.ts --pages 5  # test with fewer pages
+ *   npx tsx scripts/import-recent-films.ts --pages 5
  */
 
 import Database from "better-sqlite3";
 import Anthropic from "@anthropic-ai/sdk";
 import path from "path";
+import fs from "fs";
 
-const API_KEY = process.env.TMDB_API_KEY || "f8a0148b386a3f00558c847eb9e4284f";
-const IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
-const DELAY_MS = 300;
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const TMDB_KEY = process.env.TMDB_API_KEY || "f8a0148b386a3f00558c847eb9e4284f";
+const IMAGE_BASE    = "https://image.tmdb.org/t/p/w500";
+const BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280";
+const PROFILE_BASE  = "https://image.tmdb.org/t/p/w185";
+
+// Load .env.local for optional keys without overwriting env vars already set
+if (!process.env.ANTHROPIC_API_KEY || !process.env.YOUTUBE_API_KEY) {
+  const envPath = path.resolve(__dirname, "../.env.local");
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, "utf8").split("\n")) {
+      const eqIdx = line.indexOf("=");
+      if (eqIdx < 1) continue;
+      const k = line.slice(0, eqIdx).trim();
+      const v = line.slice(eqIdx + 1).trim();
+      if (k && !process.env[k]) process.env[k] = v;
+    }
+  }
+}
+
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ?? null;
+const YOUTUBE_KEY   = process.env.YOUTUBE_API_KEY   ?? null;
+
+const args = process.argv.slice(2);
+const pagesIdx = args.indexOf("--pages");
+const maxPages = pagesIdx !== -1 ? parseInt(args[pagesIdx + 1]) : 20;
+
+// ── Database ──────────────────────────────────────────────────────────────────
 
 const dbPath = path.resolve(process.cwd(), "prisma/dev.db");
 const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = OFF");
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// ── Clients ───────────────────────────────────────────────────────────────────
 
-const args = process.argv.slice(2);
-const pagesIdx = args.indexOf("--pages");
-const maxPages = pagesIdx !== -1 ? parseInt(args[pagesIdx + 1]) : 20;
+const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-interface TMDBMovie {
-  id: number;
-  title: string;
-  original_title: string;
-  overview: string;
-  release_date: string;
-  poster_path: string | null;
-  backdrop_path: string | null;
-  vote_average: number;
-  vote_count: number;
-  popularity: number;
-  genre_ids: number[];
-}
+function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-interface TMDBMovieDetail {
-  id: number;
-  imdb_id: string | null;
-  credits?: {
-    crew: Array<{ job: string; name: string }>;
-    cast: Array<{ name: string; order: number }>;
-  };
-}
-
-function slugify(title: string, year: number | null): string {
-  const base = title
-    .toLowerCase()
+function slugify(str: string, year: number | null = null): string {
+  const base = str.toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
@@ -68,97 +75,57 @@ function slugify(title: string, year: number | null): string {
 }
 
 function makeUniqueSlug(slug: string): string {
-  const existing = db.prepare("SELECT id FROM films WHERE slug = ?").get(slug);
-  if (!existing) return slug;
+  const taken = (s: string) => !!db.prepare("SELECT id FROM films WHERE slug = ?").get(s);
+  if (!taken(slug)) return slug;
   let i = 2;
-  while (db.prepare("SELECT id FROM films WHERE slug = ?").get(`${slug}-${i}`)) i++;
+  while (taken(`${slug}-${i}`)) i++;
   return `${slug}-${i}`;
 }
 
-// ── One-liner generation ───────────────────────────────────────────────────────
+// ── TMDB types ────────────────────────────────────────────────────────────────
 
-const FEW_SHOT_EXAMPLES = [
-  {
-    title: "Om Shanti Om", year: 2007, overview: "A junior artist falls in love with a top actress in the 1970s and is reborn as a top star three decades later.",
-    oneliner: "Tongue explosively in-cheek, Director Farah Khan's homage to yesteryear's Bollywood is sizzling with masala: item numbers, reincarnation, sideburns, and so much more!",
-  },
-  {
-    title: "Udaan", year: 2010, overview: "A teenager is sent away to boarding school by his strict father, but when he returns home he finds himself caught between his father's iron will and his own dreams of becoming a writer.",
-    oneliner: "A refreshing look at youth, dreams, and the sometimes unpleasant complications of a father-son relationship, Udaan is gritty, powerful, and definitely worth checking out.",
-  },
-  {
-    title: "Roja", year: 1992, overview: "A newlywed woman fights to free her husband, a government official who has been taken hostage by militants in Kashmir.",
-    oneliner: "Director Mani Ratnam's crisp storytelling and A.R. Rahman's stunning debut help Roja blossom into an enthralling tale of terrorism and love.",
-  },
-  {
-    title: "Jaani Dushman: Ek Anokhi Kahani", year: 2002, overview: "A group of college students are stalked and killed by a supernatural entity.",
-    oneliner: "Hideously cartoonish and senseless, Jaani Dushman reminds Bollywood that spending all your money on A-list actors doesn't guarantee a movie that's watchable.",
-  },
-  {
-    title: "Veer-Zaara", year: 2004, overview: "An Indian pilot falls in love with a Pakistani girl across the political divide of their countries.",
-    oneliner: "VZ embodies typical Yash Raj star-crossed lovers storytelling, albeit in a new setting across the Indo-Pak border, and features exactly what you'd want from SRK.",
-  },
-  {
-    title: "Love Sex aur Dhokha", year: 2010, overview: "Three stories told through video footage explore sexuality, relationships and violence in contemporary India.",
-    oneliner: "Deeply cutting satire and an innovative approach to storytelling define LSAD, which reveals possibilities yet latent in Bollywood just as it reveals us.",
-  },
-  {
-    title: "Chhaava", year: 2025, overview: "The story of Maratha warrior king Sambhaji Maharaj and his resistance against the Mughal emperor Aurangzeb.",
-    oneliner: "Maratha emperor Sambhaji Maharaj rises against Aurangzeb's Mughal forces in this grand historical epic.",
-  },
-  {
-    title: "Kill", year: 2024, overview: "A commando boards a train to stop the engagement of his love interest, but ends up fighting for survival when a large gang of robbers take over the train.",
-    oneliner: "A commando's mission to rescue his fiancée turns the world's most violent train journey into a blood-soaked action showpiece.",
-  },
-];
-
-async function generateOneliner(
-  title: string,
-  year: number | null,
-  overview: string,
-): Promise<string | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (!overview.trim()) return null;
-
-  const examples = FEW_SHOT_EXAMPLES.map(
-    (e) => `Film: ${e.title} (${e.year})\nPlot: ${e.overview}\nOneliner: ${e.oneliner}`
-  ).join("\n\n");
-
-  try {
-    const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 120,
-      messages: [
-        {
-          role: "user",
-          content: `You write one-liner blurbs for Dishoom Films, a Bollywood review site. The voice is that of a sharp, witty film critic — punchy, opinionated, and knowledgeable. Blurbs are 1–2 sentences (15–30 words). They can praise, skewer, or be ambivalent. They name directors and stars when relevant. They never use hashtags or exclamation marks unless genuinely warranted.
-
-Examples:
-
-${examples}
-
-Now write a one-liner for this film. Output only the one-liner, no quotes, no explanation.
-
-Film: ${title} (${year ?? "unknown"})
-Plot: ${overview}
-Oneliner:`,
-        },
-      ],
-    });
-
-    const text = msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
-    return text || null;
-  } catch (err) {
-    console.warn(`    [Claude] failed for "${title}":`, (err as Error).message);
-    return null;
-  }
+interface TMDBMovie {
+  id: number;
+  title: string;
+  overview: string;
+  release_date: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  vote_average: number;
+  vote_count: number;
 }
 
-// ── TMDB fetching ─────────────────────────────────────────────────────────────
+interface TMDBCast {
+  name: string;
+  character: string;
+  order: number;
+  profile_path: string | null;
+}
+
+interface TMDBCrew {
+  job: string;
+  name: string;
+  profile_path: string | null;
+}
+
+interface TMDBVideo {
+  site: string;
+  key: string;
+  type: string;
+  official: boolean;
+}
+
+interface TMDBDetail {
+  backdrop_path: string | null;
+  credits: { cast: TMDBCast[]; crew: TMDBCrew[] };
+  videos: { results: TMDBVideo[] };
+}
+
+// ── TMDB fetchers ─────────────────────────────────────────────────────────────
 
 async function fetchPage(page: number): Promise<{ results: TMDBMovie[]; total_pages: number }> {
   const params = new URLSearchParams({
-    api_key: API_KEY,
+    api_key: TMDB_KEY,
     with_original_language: "hi",
     sort_by: "popularity.desc",
     "primary_release_date.gte": "2012-01-01",
@@ -166,9 +133,7 @@ async function fetchPage(page: number): Promise<{ results: TMDBMovie[]; total_pa
     "vote_count.gte": "50",
     page: String(page),
   });
-
-  const url = `https://api.themoviedb.org/3/discover/movie?${params}`;
-  const res = await fetch(url);
+  const res = await fetch(`https://api.themoviedb.org/3/discover/movie?${params}`);
   if (!res.ok) {
     if (res.status === 429) { await sleep(2000); return fetchPage(page); }
     throw new Error(`TMDB error ${res.status} on page ${page}`);
@@ -176,22 +141,205 @@ async function fetchPage(page: number): Promise<{ results: TMDBMovie[]; total_pa
   return res.json();
 }
 
-async function fetchDetails(tmdbId: number): Promise<TMDBMovieDetail> {
-  const url = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${API_KEY}&append_to_response=credits`;
+async function fetchDetails(tmdbId: number): Promise<TMDBDetail | null> {
+  const url = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_KEY}&append_to_response=credits,videos`;
   const res = await fetch(url);
   if (!res.ok) {
     if (res.status === 429) { await sleep(2000); return fetchDetails(tmdbId); }
-    return { id: tmdbId, imdb_id: null };
+    return null;
   }
   return res.json();
 }
 
-const insertFilm = db.prepare(`
-  INSERT OR IGNORE INTO films
-    (title, year, rating, votes, poster_src, backdrop_src, summary, oneliner, slug, status, tmdb_id)
-  VALUES
-    (@title, @year, @rating, @votes, @poster_src, @backdrop_src, @summary, @oneliner, @slug, @status, @tmdb_id)
+function extractTrailer(videos: TMDBVideo[]): string | null {
+  const trailers = videos.filter(v => v.site === "YouTube" && v.type === "Trailer");
+  const official = trailers.find(v => v.official);
+  return (official ?? trailers[0])?.key ?? null;
+}
+
+// ── People helpers ────────────────────────────────────────────────────────────
+
+const findPersonByName = db.prepare("SELECT id FROM people WHERE lower(name) = lower(?)");
+const upsertPerson = db.prepare(`
+  INSERT INTO people (name, slug, image_url, type)
+  VALUES (@name, @slug, @image_url, @type)
+  ON CONFLICT(slug) DO UPDATE SET image_url = COALESCE(excluded.image_url, people.image_url)
 `);
+const insertFilmPerson = db.prepare(`
+  INSERT OR IGNORE INTO film_people (film_id, person_id, role, character)
+  VALUES (@film_id, @person_id, @role, @character)
+`);
+
+function getOrCreatePerson(name: string, imageUrl: string | null, type: string): number {
+  const existing = findPersonByName.get(name) as { id: number } | undefined;
+  if (existing) {
+    if (imageUrl) {
+      db.prepare("UPDATE people SET image_url = COALESCE(?, image_url) WHERE id = ?").run(imageUrl, existing.id);
+    }
+    return existing.id;
+  }
+  const base = slugify(name);
+  let slug = base;
+  let i = 2;
+  while (db.prepare("SELECT id FROM people WHERE slug = ?").get(slug)) slug = `${base}-${i++}`;
+  const row = upsertPerson.run({ name, slug, image_url: imageUrl, type });
+  return row.lastInsertRowid as number;
+}
+
+// ── DB insert / update statements ─────────────────────────────────────────────
+
+const insertFilm = db.prepare(`
+  INSERT OR IGNORE INTO films (
+    title, year, rating, votes,
+    poster_src, backdrop_src, summary, oneliner,
+    slug, status, tmdb_id,
+    trailer, stars, writers, music_directors, badges
+  ) VALUES (
+    @title, @year, @rating, @votes,
+    @poster_src, @backdrop_src, @summary, @oneliner,
+    @slug, @status, @tmdb_id,
+    @trailer, @stars, @writers, @music_directors, @badges
+  )
+`);
+
+const insertSong = db.prepare(`
+  INSERT OR IGNORE INTO songs (film_id, title, youtube_id, category)
+  VALUES (@film_id, @title, @youtube_id, @category)
+`);
+
+// ── Badge taxonomy (exact values used throughout the site) ────────────────────
+
+const BADGE_LIST = [
+  "Dishoom Dishoom", "100% Masala", "Cult Classic", "Love/Romance",
+  "Angry Young Man", "Blockbuster", "Movies with a Message",
+  "Candy-Floss/NRI Romance", "No Brain Required Comedy", "Star-Crossed Lovers",
+  "Family Dysfunction", "Period Piece", "Parallel Cinema", "Timepass",
+  "Thrilllerrr", "Hatkay", "Just Do It Dramas", "Drama", "Action",
+  "Comedy", "Crime", "Feel Good", "Patriotic",
+];
+
+// ── Song tag taxonomy ─────────────────────────────────────────────────────────
+
+const SONG_TAGS = [
+  "romantic", "dance-floor", "item-number", "qawwali", "ghazal", "folk",
+  "soulful", "earworm", "anthem", "tear-jerker", "heartbreak", "melancholy",
+  "euphoric", "playful", "defiant", "bhajan", "sufi", "wedding", "patriotic",
+  "devotional", "iconic", "evergreen", "ar-rahman", "lata-mangeshkar",
+  "slow-burn", "singalong", "campfire", "monsoon", "rain-romance",
+].join(", ");
+
+// ── Few-shot examples for oneliner style ──────────────────────────────────────
+
+const FEW_SHOT = [
+  { t: "Om Shanti Om (2007)",    o: "Tongue explosively in-cheek, Director Farah Khan's homage to yesteryear's Bollywood is sizzling with masala: item numbers, reincarnation, sideburns, and so much more!" },
+  { t: "Udaan (2010)",           o: "A refreshing look at youth, dreams, and the sometimes unpleasant complications of a father-son relationship — gritty, powerful, and worth your time." },
+  { t: "Roja (1992)",            o: "Mani Ratnam's crisp storytelling and A.R. Rahman's stunning debut help Roja blossom into an enthralling tale of terrorism and love." },
+  { t: "Jaani Dushman (2002)",   o: "Hideously cartoonish and senseless — a reminder that spending all your money on A-list stars doesn't guarantee a film that's watchable." },
+  { t: "Kill (2024)",            o: "A commando's mission to rescue his fiancée turns the world's most violent train journey into a blood-soaked action showpiece." },
+  { t: "Stree 2 (2024)",         o: "The witch is back — Chanderi's most fearless heroine returns to face a terrifying new supernatural threat." },
+  { t: "Veer-Zaara (2004)",      o: "VZ embodies typical Yash Raj star-crossed lovers storytelling across the Indo-Pak border, and features exactly what you'd want from SRK." },
+  { t: "Love Sex aur Dhokha (2010)", o: "Deeply cutting satire and an innovative approach to storytelling define LSAD, which reveals possibilities yet latent in Bollywood." },
+].map(e => `Film: ${e.t}\nOneliner: ${e.o}`).join("\n\n");
+
+// ── Claude: generate oneliner + badges + songs in one call ───────────────────
+
+interface ClaudeFilmData {
+  oneliner: string | null;
+  badges: string[];
+  songs: Array<{ title: string; tags: string[] }>;
+}
+
+async function generateFilmData(
+  title: string,
+  year: number | null,
+  overview: string,
+  director: string | null,
+  leadCast: string[],
+): Promise<ClaudeFilmData> {
+  if (!anthropic || !overview.trim()) return { oneliner: null, badges: [], songs: [] };
+
+  const castLine = leadCast.slice(0, 4).join(", ");
+
+  const prompt = `You are the editorial voice of Dishoom Films, a Bollywood review site. For the film below, return a single JSON object with exactly three fields.
+
+"oneliner" — a punchy critic blurb, 15–30 words. Opinionated — can praise, skewer, or be ambivalent. Names director or stars when relevant. No exclamation marks unless truly earned. Match this style exactly:
+
+${FEW_SHOT}
+
+"badges" — pick 1–3 vibe tags from this exact list only (use exact strings):
+${BADGE_LIST.join(", ")}
+
+"songs" — list the 3–6 most well-known songs from this film that you are genuinely confident about. Return an empty array if you are not confident. Each song needs:
+  "title": exact song title
+  "tags": 2–4 tags from: ${SONG_TAGS}
+
+---
+Film: ${title} (${year ?? "unknown"})${director ? `\nDirector: ${director}` : ""}${castLine ? `\nCast: ${castLine}` : ""}
+Plot: ${overview}
+---
+
+Return only valid JSON, no markdown fences, no explanation:
+{"oneliner":"...","badges":["..."],"songs":[{"title":"...","tags":["..."]}]}`;
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 500,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+    // Strip accidental markdown fences
+    const json = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsed = JSON.parse(json) as Partial<ClaudeFilmData>;
+
+    return {
+      oneliner: typeof parsed.oneliner === "string" && parsed.oneliner.trim() ? parsed.oneliner.trim() : null,
+      badges:   Array.isArray(parsed.badges) ? parsed.badges.filter(b => BADGE_LIST.includes(b)) : [],
+      songs:    Array.isArray(parsed.songs)  ? parsed.songs  : [],
+    };
+  } catch (err) {
+    console.warn(`\n    [Claude] failed for "${title}": ${(err as Error).message}`);
+    return { oneliner: null, badges: [], songs: [] };
+  }
+}
+
+// ── YouTube song lookup ───────────────────────────────────────────────────────
+
+const PREFERRED_YT_CHANNELS = new Set([
+  "UCq-Fj5jknLsUf-MWSy4_brA", // T-Series
+  "UCLK_BkHm0YTMVHFqPCHSAhg", // Sony Music India
+  "UCRvm6_bE6v0CSnOlFMVpBoQ", // Zee Music Company
+  "UCJrDMFOdv1I2k8n9oK_V21w", // Tips Official
+  "UCNUYwRhZBo5O48SJLb5j0Ug", // YRF
+  "UC6TE96JlxaqiAIHJOuHWNZA", // Speed Records
+]);
+
+async function findSongOnYouTube(songTitle: string, filmTitle: string, year: number | null): Promise<string | null> {
+  if (!YOUTUBE_KEY) return null;
+
+  const query = `${songTitle} ${filmTitle}${year ? ` ${year}` : ""} official audio`;
+  const url = new URL("https://www.googleapis.com/youtube/v3/search");
+  url.searchParams.set("part", "snippet");
+  url.searchParams.set("q", query);
+  url.searchParams.set("type", "video");
+  url.searchParams.set("videoCategoryId", "10"); // Music
+  url.searchParams.set("maxResults", "5");
+  url.searchParams.set("key", YOUTUBE_KEY);
+
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      items: { id: { videoId: string }; snippet: { channelId: string } }[];
+    };
+    if (!data.items?.length) return null;
+    const preferred = data.items.find(i => PREFERRED_YT_CHANNELS.has(i.snippet.channelId));
+    return (preferred ?? data.items[0]).id.videoId;
+  } catch {
+    return null;
+  }
+}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -201,73 +349,156 @@ async function main() {
   let inserted = 0;
   let skipped = 0;
 
-  const hasClaudeKey = !!process.env.ANTHROPIC_API_KEY;
-  console.log(`Importing recent Bollywood films from TMDB (up to ${maxPages} pages)...`);
-  console.log(`One-liner generation: ${hasClaudeKey ? "enabled (Claude Haiku)" : "disabled (set ANTHROPIC_API_KEY to enable)"}\n`);
+  console.log(`Importing recent Bollywood films (up to ${maxPages} pages)`);
+  console.log(`Claude:  ${anthropic     ? "enabled (claude-haiku-4-5)" : "disabled — set ANTHROPIC_API_KEY"}`);
+  console.log(`YouTube: ${YOUTUBE_KEY   ? "enabled"                    : "disabled — songs filled later by fetch-youtube-ids.ts"}\n`);
 
   while (page <= Math.min(totalPages, maxPages)) {
-    process.stdout.write(`  Page ${page}/${Math.min(totalPages, maxPages)}...`);
-    const data = await fetchPage(page);
-    totalPages = data.total_pages;
+    process.stdout.write(`Page ${page}/${Math.min(totalPages, maxPages)}...`);
+    const pageData = await fetchPage(page);
+    totalPages = pageData.total_pages;
 
-    for (const movie of data.results) {
+    for (const movie of pageData.results) {
       const year = movie.release_date ? parseInt(movie.release_date.slice(0, 4)) : null;
       const titleLower = movie.title.toLowerCase();
 
-      const existing = db.prepare(
+      // Skip if already in DB
+      const existingFilm = db.prepare(
         "SELECT id FROM films WHERE lower(title) = ? AND year = ?"
-      ).get(titleLower, year);
+      ).get(titleLower, year) as { id: number } | undefined;
 
-      if (existing) {
-        skipped++;
-        continue;
-      }
+      if (existingFilm) { skipped++; continue; }
 
-      const rating = movie.vote_average > 0
-        ? Math.round(movie.vote_average * 10)
+      // ── 1. TMDB full details (credits + videos) ────────────────────────────
+      const detail = await fetchDetails(movie.id);
+      await sleep(250);
+
+      const cast      = (detail?.credits?.cast ?? []).filter(c => c.order < 10);
+      const crew      = detail?.credits?.crew ?? [];
+      const videos    = detail?.videos?.results ?? [];
+
+      const directors  = crew.filter(c => c.job === "Director");
+      const writers    = crew.filter(c => ["Screenplay", "Story", "Writer"].includes(c.job));
+      const composers  = crew.filter(c => c.job === "Original Music Composer");
+
+      const trailerKey    = extractTrailer(videos);
+      const leadCastNames = cast.slice(0, 4).map(c => c.name);
+      const directorName  = directors[0]?.name ?? null;
+      const backdropUrl   = (detail?.backdrop_path ?? movie.backdrop_path)
+        ? `${BACKDROP_BASE}${detail?.backdrop_path ?? movie.backdrop_path}`
         : null;
 
+      // ── 2. Claude: oneliner + badges + songs ──────────────────────────────
+      const claude = await generateFilmData(
+        movie.title, year, movie.overview || "",
+        directorName, leadCastNames,
+      );
+
+      // ── 3. Insert film row ─────────────────────────────────────────────────
       const slug = makeUniqueSlug(slugify(movie.title, year));
-      const posterUrl = movie.poster_path ? `${IMAGE_BASE}${movie.poster_path}` : null;
-      const backdropUrl = movie.backdrop_path
-        ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
-        : null;
-
-      const oneliner = await generateOneliner(movie.title, year, movie.overview || "");
 
       insertFilm.run({
-        title: movie.title,
+        title:           movie.title,
         year,
-        rating,
-        votes: movie.vote_count || 0,
-        poster_src: posterUrl,
-        backdrop_src: backdropUrl,
-        summary: movie.overview || null,
-        oneliner: oneliner ?? null,
+        rating:          movie.vote_average > 0 ? Math.round(movie.vote_average * 10) : null,
+        votes:           movie.vote_count || 0,
+        poster_src:      movie.poster_path ? `${IMAGE_BASE}${movie.poster_path}` : null,
+        backdrop_src:    backdropUrl,
+        summary:         movie.overview || null,
+        oneliner:        claude.oneliner,
         slug,
-        status: null,
-        tmdb_id: movie.id,
+        status:          null,
+        tmdb_id:         movie.id,
+        trailer:         trailerKey,
+        stars:           leadCastNames.join(", ") || null,
+        writers:         writers.map(w => w.name).join(", ") || null,
+        music_directors: composers.map(c => c.name).join(", ") || null,
+        badges:          claude.badges.join(",") || null,
       });
 
-      if (oneliner) {
-        console.log(`\n    + ${movie.title} (${year}): "${oneliner}"`);
+      // Get the newly-inserted film's DB id
+      const filmRow = db.prepare(
+        "SELECT id FROM films WHERE lower(title) = ? AND year = ?"
+      ).get(titleLower, year) as { id: number } | undefined;
+      if (!filmRow) { skipped++; continue; }
+      const filmId = filmRow.id;
+
+      // ── 4. Populate film_people (cast + director + writers + composers) ────
+      const savePeople = db.transaction(() => {
+        for (const c of cast) {
+          const img      = c.profile_path ? `${PROFILE_BASE}${c.profile_path}` : null;
+          const personId = getOrCreatePerson(c.name, img, "actor");
+          insertFilmPerson.run({ film_id: filmId, person_id: personId, role: "actor", character: c.character || null });
+        }
+        for (const d of directors) {
+          const img      = d.profile_path ? `${PROFILE_BASE}${d.profile_path}` : null;
+          const personId = getOrCreatePerson(d.name, img, "director");
+          insertFilmPerson.run({ film_id: filmId, person_id: personId, role: "director", character: null });
+        }
+        for (const w of writers.slice(0, 3)) {
+          const img      = w.profile_path ? `${PROFILE_BASE}${w.profile_path}` : null;
+          const personId = getOrCreatePerson(w.name, img, "writer");
+          insertFilmPerson.run({ film_id: filmId, person_id: personId, role: "writer", character: null });
+        }
+        for (const c of composers) {
+          const img      = c.profile_path ? `${PROFILE_BASE}${c.profile_path}` : null;
+          const personId = getOrCreatePerson(c.name, img, "music_director");
+          insertFilmPerson.run({ film_id: filmId, person_id: personId, role: "music_director", character: null });
+        }
+      });
+      savePeople();
+
+      // ── 5. Insert songs + search YouTube ──────────────────────────────────
+      for (const song of claude.songs) {
+        const youtubeId = await findSongOnYouTube(song.title, movie.title, year);
+        if (YOUTUBE_KEY) await sleep(200);
+
+        insertSong.run({
+          film_id:    filmId,
+          title:      song.title,
+          youtube_id: youtubeId,
+          category:   song.tags.join(",") || null,
+        });
       }
 
+      // ── Summary line ───────────────────────────────────────────────────────
+      const parts: string[] = [];
+      if (directorName) parts.push(`dir. ${directorName}`);
+      if (cast.length)  parts.push(`${cast.length} cast`);
+      if (trailerKey)   parts.push("trailer");
+      if (claude.songs.length) parts.push(`${claude.songs.length} songs`);
+      if (claude.badges.length) parts.push(claude.badges.join(", "));
+
+      console.log(`\n  + ${movie.title} (${year})`);
+      if (claude.oneliner) console.log(`    "${claude.oneliner}"`);
+      if (parts.length)    console.log(`    ${parts.join(" | ")}`);
+
       inserted++;
-      if (hasClaudeKey) await sleep(200); // small gap between Claude calls
+      await sleep(300);
     }
 
-    console.log(` inserted: ${inserted}, skipped: ${skipped}`);
+    process.stdout.write(` inserted: ${inserted}, skipped: ${skipped}\n`);
     page++;
-    await sleep(DELAY_MS);
+    await sleep(300);
   }
 
+  // ── Final summary ─────────────────────────────────────────────────────────
   console.log(`\nDone!`);
   console.log(`  Inserted: ${inserted} new films`);
   console.log(`  Skipped:  ${skipped} already in DB`);
 
   const total = (db.prepare("SELECT COUNT(*) as n FROM films").get() as { n: number }).n;
-  console.log(`  Total films in DB: ${total}`);
+  const withOneliner = (db.prepare("SELECT COUNT(*) as n FROM films WHERE oneliner IS NOT NULL AND oneliner != ''").get() as { n: number }).n;
+  const withTrailer  = (db.prepare("SELECT COUNT(*) as n FROM films WHERE trailer IS NOT NULL AND trailer != ''").get() as { n: number }).n;
+  const withCast     = (db.prepare("SELECT COUNT(DISTINCT film_id) as n FROM film_people").get() as { n: number }).n;
+  const songCount    = (db.prepare("SELECT COUNT(*) as n FROM songs WHERE youtube_id IS NOT NULL").get() as { n: number }).n;
+
+  console.log(`\n  DB totals:`);
+  console.log(`    Films:         ${total.toLocaleString()}`);
+  console.log(`    With oneliner: ${withOneliner.toLocaleString()}`);
+  console.log(`    With trailer:  ${withTrailer.toLocaleString()}`);
+  console.log(`    With cast:     ${withCast.toLocaleString()}`);
+  console.log(`    Songs w/ YT:   ${songCount.toLocaleString()}`);
 
   db.close();
 }
