@@ -66,10 +66,12 @@ Go to your service → **Variables** and add:
 |---|---|---|
 | `DB_PATH` | `/data/dishoom.db` | Where the live db lives on the volume |
 | `R2_ACCOUNT_ID` | `<your cloudflare account id>` | From R2 overview page |
-| `R2_BUCKET` | `dishoom-db` | The bucket name you created |
+| `R2_BUCKET` | `<your bucket name>` | The bucket name you created in step 2 |
 | `LITESTREAM_ACCESS_KEY_ID` | `<r2 access key id>` | From R2 API token creation |
 | `LITESTREAM_SECRET_ACCESS_KEY` | `<r2 secret access key>` | From R2 API token creation |
 | `TMDB_API_KEY` | `<your tmdb api key>` | Used by data import scripts |
+| `YOUTUBE_API_KEY` | `<your youtube data api key>` | Used by song/video import scripts |
+| `ANTHROPIC_API_KEY` | `<your anthropic api key>` | Used by AI article generation scripts |
 
 Railway also needs `PORT` — it sets this automatically, no action needed.
 
@@ -135,11 +137,13 @@ npx tsx scripts/import-articles.ts         # import article content
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `DB_PATH` | Production only | `prisma/dev.db` | Path to SQLite database |
+| `DB_PATH` | Production only | `prisma/dev.db` (local) | Set to `/data/dishoom.db` in Railway |
 | `R2_ACCOUNT_ID` | Production only | — | Cloudflare account ID |
 | `R2_BUCKET` | Production only | — | R2 bucket name |
 | `LITESTREAM_ACCESS_KEY_ID` | Production only | — | R2 S3-compatible access key |
 | `LITESTREAM_SECRET_ACCESS_KEY` | Production only | — | R2 S3-compatible secret key |
 | `TMDB_API_KEY` | Scripts only | — | TMDB v3 API key for data imports |
+| `YOUTUBE_API_KEY` | Scripts only | — | YouTube Data API v3 key for video imports |
+| `ANTHROPIC_API_KEY` | Scripts only | — | Anthropic API key for AI article generation |
 
 Without `LITESTREAM_ACCESS_KEY_ID`, the app starts normally without replication (safe for local dev).
