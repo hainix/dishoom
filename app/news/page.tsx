@@ -103,7 +103,7 @@ function ArticleCard({ article }: { article: Article }) {
         <img
           src={thumbUrl(article)}
           alt={article.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
         />
         {article.isSpotlight ? (
           <div className="absolute top-2 left-2">
