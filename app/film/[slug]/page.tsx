@@ -188,9 +188,17 @@ export default async function FilmPage({ params }: FilmPageProps) {
             )}
 
             {displayOneliner && (
-              <p className="italic leading-relaxed mb-3"
-                style={{ color: "rgba(255,255,255,0.6)", fontSize: "1rem", maxWidth: "36rem" }}>
-                &ldquo;{displayOneliner}&rdquo;
+              <p className="italic leading-relaxed mb-4"
+                style={{
+                  color: "#D4AF37",
+                  fontSize: "1.15rem",
+                  maxWidth: "36rem",
+                  borderLeft: "3px solid rgba(212,175,55,0.5)",
+                  paddingLeft: "1rem",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 500,
+                }}>
+                {displayOneliner}
               </p>
             )}
 
