@@ -27,8 +27,10 @@ const update = db.prepare("UPDATE articles SET content = ? WHERE id = ?");
 /** Strip any existing <a> links (unwrap to plain text) so we start clean */
 function stripLinks(html: string): string {
   return html
-    .replace(/<a\s[^>]*>/gi, "")
-    .replace(/<\/a>/gi, "");
+    .replace(/<a\s[^>]*>/gi, "")   // strip opening <a> tags (up to first >)
+    .replace(/<\/a>/gi, "")         // strip closing </a> tags
+    // Remove leftover `word="color:#D4AF37...">`  fragments from previously-malformed nested <a> tags
+    .replace(/\w*="color:#D4AF37[^"]*">/g, "");
 }
 
 let changed = 0;
