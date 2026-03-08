@@ -21,12 +21,10 @@ export default function WatchPlayer({
 }: WatchPlayerProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLButtonElement>(null);
 
   const activeSong = songs[activeIndex];
 
-  // Scroll active song into view in the playlist
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [activeIndex]);
@@ -44,7 +42,6 @@ export default function WatchPlayer({
     if (activeIndex < songs.length - 1) selectSong(activeIndex + 1);
   }, [activeIndex, songs.length, selectSong]);
 
-  // Keyboard navigation
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); prev(); }
@@ -60,135 +57,119 @@ export default function WatchPlayer({
   const activeTags = activeSong.category ? activeSong.category.split(",").slice(0, 6) : [];
 
   return (
-    <div className="flex flex-col lg:flex-row w-full" style={{ height: "100%", minHeight: 0 }}>
+    <div className="w-full" style={{ background: "#0d0505" }}>
 
-      {/* ── Centre: player + info ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: "#0d0505" }}>
-
-        {/* Player — 16:9 */}
-        <div className="relative w-full flex-shrink-0" style={{ paddingBottom: "56.25%", height: 0 }}>
-          {isPlaying ? (
-            <iframe
-              key={activeSong.id}
-              src={`https://www.youtube.com/embed/${activeSong.youtubeId}?autoplay=1&rel=0`}
-              className="absolute inset-0 w-full h-full"
-              allowFullScreen
-              allow="autoplay; encrypted-media"
-              title={activeSong.title || ""}
+      {/* ── Video — full-width 16:9 ──────────────────────────────────────── */}
+      <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+        {isPlaying ? (
+          <iframe
+            key={activeSong.id}
+            src={`https://www.youtube.com/embed/${activeSong.youtubeId}?autoplay=1&rel=0`}
+            className="absolute inset-0 w-full h-full"
+            allowFullScreen
+            allow="autoplay; encrypted-media"
+            title={activeSong.title || ""}
+          />
+        ) : (
+          <button
+            className="absolute inset-0 w-full h-full group"
+            onClick={() => setIsPlaying(true)}
+            aria-label={`Play ${activeSong.title}`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumbUrl}
+              alt={activeSong.title || ""}
+              className="absolute inset-0 w-full h-full object-cover"
             />
-          ) : (
-            /* Thumbnail with play prompt */
-            <button
-              className="absolute inset-0 w-full h-full group"
-              onClick={() => setIsPlaying(true)}
-              aria-label={`Play ${activeSong.title}`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumbUrl}
-                alt={activeSong.title || ""}
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center"
-                   style={{ background: "rgba(13,5,5,0.35)" }}>
-                <div
-                  className="flex items-center justify-center shadow-2xl transition-transform duration-200 group-hover:scale-110"
-                  style={{ width: 72, height: 72, borderRadius: "50%", background: "#EF4832" }}
-                >
-                  <svg viewBox="0 0 24 24" fill="white" style={{ width: 32, height: 32, marginLeft: 4 }}>
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
+            <div className="absolute inset-0 flex items-center justify-center"
+                 style={{ background: "rgba(13,5,5,0.3)" }}>
+              <div
+                className="flex items-center justify-center shadow-2xl transition-transform duration-200 group-hover:scale-110"
+                style={{ width: 72, height: 72, borderRadius: "50%", background: "#EF4832" }}
+              >
+                <svg viewBox="0 0 24 24" fill="white" style={{ width: 32, height: 32, marginLeft: 4 }}>
+                  <path d="M8 5v14l11-7z" />
+                </svg>
               </div>
-            </button>
-          )}
-        </div>
-
-        {/* Spacious song info section */}
-        <div className="flex-1 px-8 py-6 overflow-y-auto" style={{ background: "#110404" }}>
-          {/* Top row: nav buttons + position */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={prev}
-                disabled={activeIndex === 0}
-                className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
-                style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
-                aria-label="Previous"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
-                  <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
-                </svg>
-              </button>
-              <button
-                onClick={next}
-                disabled={activeIndex === songs.length - 1}
-                className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
-                style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
-                aria-label="Next"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
-                  <path d="M6 18l8.5-6L6 6v12zm2.5-6 6-4.26V16.26z" />
-                </svg>
-              </button>
             </div>
-            <span className="text-xs tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
-              {activeIndex + 1} / {songs.length}
-              <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.15)" }}> · ← → to navigate</span>
-            </span>
-          </div>
-
-          {/* Song title */}
-          <h2
-            className="text-2xl font-bold leading-tight mb-1"
-            style={{ fontFamily: "var(--font-display)", color: "#FFF8EE" }}
-          >
-            {activeSong.title || "Untitled"}
-          </h2>
-
-          {/* Film link */}
-          <Link
-            href={`/film/${activeSong.filmSlug}`}
-            className="inline-flex items-center gap-1 text-sm hover:underline mb-4"
-            style={{ color: "#D4AF37" }}
-          >
-            {activeSong.filmTitle}
-            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 12, height: 12, opacity: 0.7 }}>
-              <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-            </svg>
-          </Link>
-
-          {/* Tag chips — clickable links */}
-          {activeTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {activeTags.map((tag) => (
-                <Link
-                  key={tag}
-                  href={`/watch?category=${encodeURIComponent(tag)}&page=1`}
-                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
-                  style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)" }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
-                >
-                  {categoryLabels[tag] ?? tag}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+          </button>
+        )}
       </div>
 
-      {/* ── Right: playlist ───────────────────────────────────────────── */}
-      <div
-        ref={listRef}
-        className="overflow-y-auto border-t lg:border-t-0 lg:border-l flex-shrink-0 lg:w-[380px] max-h-[50vh] lg:max-h-full"
-        style={{
-          borderColor: "rgba(255,255,255,0.08)",
-          background: "#0d0505",
-        }}
-      >
-        {/* Playlist header */}
-        <div className="sticky top-0 px-5 py-3 flex items-center justify-between z-10 border-b"
+      {/* ── Song info + nav controls ─────────────────────────────────────── */}
+      <div className="px-6 py-4 border-b"
+           style={{ background: "#110404", borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2
+              className="text-xl font-bold leading-tight"
+              style={{ fontFamily: "var(--font-display)", color: "#FFF8EE" }}
+            >
+              {activeSong.title || "Untitled"}
+            </h2>
+            <Link
+              href={`/film/${activeSong.filmSlug}`}
+              className="inline-flex items-center gap-1 text-sm hover:underline mt-1"
+              style={{ color: "#D4AF37" }}
+            >
+              {activeSong.filmTitle}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                   strokeLinecap="round" strokeLinejoin="round" style={{ width: 11, height: 11, opacity: 0.7 }}>
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+              </svg>
+            </Link>
+          </div>
+
+          {/* Prev / position / Next */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={prev}
+              disabled={activeIndex === 0}
+              className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
+              style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
+              aria-label="Previous"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
+                <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
+              </svg>
+            </button>
+            <span className="text-xs tabular-nums" style={{ color: "rgba(255,255,255,0.3)", minWidth: 36, textAlign: "center" }}>
+              {activeIndex + 1}/{songs.length}
+            </span>
+            <button
+              onClick={next}
+              disabled={activeIndex === songs.length - 1}
+              className="flex items-center justify-center rounded transition-colors disabled:opacity-25"
+              style={{ width: 36, height: 36, background: "rgba(255,255,255,0.07)" }}
+              aria-label="Next"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16, color: "#FFF8EE" }}>
+                <path d="M6 18l8.5-6L6 6v12zm2.5-6 6-4.26V16.26z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {activeTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {activeTags.map((tag) => (
+              <Link
+                key={tag}
+                href={`/watch?category=${encodeURIComponent(tag)}&page=1`}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors hover:bg-white/10"
+                style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)" }}
+              >
+                {categoryLabels[tag] ?? tag}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Playlist ─────────────────────────────────────────────────────── */}
+      <div>
+        <div className="sticky top-0 px-6 py-3 flex items-center justify-between z-10 border-b"
              style={{ background: "#1a0a00", borderColor: "rgba(255,255,255,0.08)" }}>
           <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#D4AF37" }}>
             Playlist
@@ -206,15 +187,14 @@ export default function WatchPlayer({
               key={song.id}
               ref={isActive ? activeItemRef : undefined}
               onClick={() => selectSong(i)}
-              className="w-full flex items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/5"
+              className="w-full flex items-center gap-4 px-6 py-3 text-left transition-colors hover:bg-white/5"
               style={{
-                background: isActive ? "rgba(212,175,55,0.10)" : "transparent",
+                background: isActive ? "rgba(212,175,55,0.08)" : "transparent",
                 borderLeft: isActive ? "3px solid #EF4832" : "3px solid transparent",
               }}
             >
               {/* Thumbnail */}
-              <div className="flex-shrink-0 relative overflow-hidden rounded"
-                   style={{ width: 64, height: 36 }}>
+              <div className="flex-shrink-0 relative overflow-hidden rounded" style={{ width: 80, height: 45 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://img.youtube.com/vi/${song.youtubeId}/default.jpg`}
@@ -228,7 +208,7 @@ export default function WatchPlayer({
                   </div>
                 )}
                 {(!isActive || !isPlaying) && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                        style={{ background: "rgba(0,0,0,0.5)" }}>
                     <svg viewBox="0 0 24 24" fill="white" style={{ width: 16, height: 16 }}>
                       <path d="M8 5v14l11-7z" />
@@ -237,15 +217,16 @@ export default function WatchPlayer({
                 )}
               </div>
 
-              {/* Text + tag chips */}
+              {/* Text + tags */}
               <div className="flex-1 min-w-0">
                 <p
-                  className="text-xs font-medium leading-tight truncate"
-                  style={{ color: isActive ? "#FFF8EE" : "rgba(255,255,255,0.65)" }}
+                  className="text-sm font-medium leading-tight truncate"
+                  style={{ color: isActive ? "#FFF8EE" : "rgba(255,255,255,0.7)" }}
                 >
                   {song.title || "Untitled"}
                 </p>
-                <p className="text-xs truncate mt-0.5" style={{ color: isActive ? "#D4AF37" : "rgba(255,255,255,0.3)" }}>
+                <p className="text-xs truncate mt-0.5"
+                   style={{ color: isActive ? "#D4AF37" : "rgba(255,255,255,0.35)" }}>
                   {song.filmTitle}
                 </p>
                 {songTags.length > 0 && (
@@ -254,11 +235,9 @@ export default function WatchPlayer({
                       <span
                         key={tag}
                         style={{
-                          fontSize: 9,
-                          padding: "1px 5px",
-                          borderRadius: 3,
+                          fontSize: 9, padding: "1px 5px", borderRadius: 3,
                           background: isActive ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
-                          color: isActive ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.3)",
+                          color: isActive ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.3)",
                         }}
                       >
                         {tag}
@@ -276,7 +255,6 @@ export default function WatchPlayer({
           );
         })}
 
-        {/* Pagination inside playlist */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-3 p-5 border-t"
                style={{ borderColor: "rgba(255,255,255,0.08)" }}>
@@ -308,7 +286,6 @@ export default function WatchPlayer({
   );
 }
 
-/** Animated bars to show currently playing */
 function PlayingBars() {
   return (
     <div className="flex items-end gap-px" style={{ height: 14 }}>
@@ -316,9 +293,7 @@ function PlayingBars() {
         <div
           key={i}
           style={{
-            width: 3,
-            background: "white",
-            borderRadius: 1,
+            width: 3, background: "white", borderRadius: 1,
             animation: `playingBar 0.8s ease-in-out ${i * 0.2}s infinite alternate`,
             height: i === 1 ? "100%" : "60%",
           }}

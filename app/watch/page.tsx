@@ -243,7 +243,7 @@ export default async function WatchPage({ searchParams }: WatchPageProps) {
 
           {/* Player or empty state */}
           {songs.length > 0 ? (
-            <div className="flex-1 overflow-hidden flex">
+            <div className="flex-1 overflow-y-auto">
               <WatchPlayer
                 songs={songs}
                 category={category}
