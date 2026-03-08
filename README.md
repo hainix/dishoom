@@ -1,36 +1,145 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dishoom
 
-## Getting Started
+Bollywood Rotten Tomatoes. Film ratings, reviews, cast profiles, songs, and news for 4,000+ Hindi films.
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router) · Tailwind CSS v4 · SQLite (better-sqlite3) · Litestream → Cloudflare R2
+
+---
+
+## Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The app reads from `prisma/dev.db` by default. No env vars needed locally.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Deploying to Railway
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [Railway](https://railway.app) account
+- [Cloudflare](https://cloudflare.com) account (for R2 backups)
+- TMDB API key (free at [themoviedb.org](https://www.themoviedb.org/settings/api))
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+### 2. Cloudflare R2 — create bucket + credentials
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Cloudflare dashboard → **R2** → **Create bucket** (e.g. `dishoom-db`)
+2. R2 overview page → **Manage R2 API Tokens** → **Create API Token**
+   - Permissions: **Object Read & Write**
+   - Scope: the bucket you just created
+3. Save the three values shown after creation:
+   - **Account ID** (visible in the R2 overview URL or top-right panel)
+   - **Access Key ID**
+   - **Secret Access Key**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+### 3. Railway — create service
+
+1. New project → **Deploy from GitHub repo** → select this repo
+2. Railway will detect the `Dockerfile` and build automatically
+
+---
+
+### 4. Railway — add a persistent volume
+
+1. Your service → **Volumes** tab → **Add Volume**
+2. Mount path: `/data`
+
+This is where the live SQLite database lives. It survives redeploys.
+
+---
+
+### 5. Railway — set environment variables
+
+Go to your service → **Variables** and add:
+
+| Variable | Value | Notes |
+|---|---|---|
+| `DB_PATH` | `/data/dishoom.db` | Where the live db lives on the volume |
+| `R2_ACCOUNT_ID` | `<your cloudflare account id>` | From R2 overview page |
+| `R2_BUCKET` | `dishoom-db` | The bucket name you created |
+| `LITESTREAM_ACCESS_KEY_ID` | `<r2 access key id>` | From R2 API token creation |
+| `LITESTREAM_SECRET_ACCESS_KEY` | `<r2 secret access key>` | From R2 API token creation |
+| `TMDB_API_KEY` | `<your tmdb api key>` | Used by data import scripts |
+
+Railway also needs `PORT` — it sets this automatically, no action needed.
+
+---
+
+### 6. Deploy
+
+Push to `main` (or trigger a redeploy in Railway).
+
+**What happens on first deploy:**
+1. Litestream checks R2 for an existing backup — finds none
+2. App seeds the database from the bundled `prisma/dev.db`
+3. Litestream immediately starts replicating the db to R2 (every 10s)
+
+**What happens on every subsequent deploy:**
+1. Litestream restores the latest db snapshot from R2
+2. The bundled `prisma/dev.db` is ignored — live data is always from R2
+
+Code pushes never overwrite the production database.
+
+---
+
+### 7. Running data scripts against production
+
+Use the Railway CLI to run import/update scripts against the live database:
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login and link
+railway login
+railway link
+
+# Run a script against the live db
+railway run npx tsx scripts/update-current-films.ts
+```
+
+All changes are automatically replicated to R2 within 10 seconds.
+
+---
+
+## Database
+
+SQLite at `prisma/dev.db` (local) or `/data/dishoom.db` (production).
+
+**4,222 films · 7,706 people · 9,449 reviews · 16,043 songs · 9 articles**
+
+Schema: `prisma/migrations/20260307074215_init/migration.sql`
+
+### Import scripts (run from `dishoom-app/`)
+
+```bash
+npx tsx scripts/update-current-films.ts   # update statuses, add new releases
+npx tsx scripts/enrich-films.ts            # fetch missing TMDB metadata
+npx tsx scripts/fetch-posters.ts           # download poster/backdrop paths
+npx tsx scripts/import-articles.ts         # import article content
+```
+
+---
+
+## Environment variables — full reference
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DB_PATH` | Production only | `prisma/dev.db` | Path to SQLite database |
+| `R2_ACCOUNT_ID` | Production only | — | Cloudflare account ID |
+| `R2_BUCKET` | Production only | — | R2 bucket name |
+| `LITESTREAM_ACCESS_KEY_ID` | Production only | — | R2 S3-compatible access key |
+| `LITESTREAM_SECRET_ACCESS_KEY` | Production only | — | R2 S3-compatible secret key |
+| `TMDB_API_KEY` | Scripts only | — | TMDB v3 API key for data imports |
+
+Without `LITESTREAM_ACCESS_KEY_ID`, the app starts normally without replication (safe for local dev).
