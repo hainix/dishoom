@@ -369,11 +369,13 @@ export interface SongWithFilm extends Song {
   filmSlug: string;
 }
 
-export function getSongsForFilm(filmId: number, limit = 10): Song[] {
+export function getSongsForFilm(filmId: number, limit = 40): Song[] {
   return getDb()
     .prepare(
       `SELECT id, film_id as filmId, title, youtube_id as youtubeId, category
-       FROM songs WHERE film_id = ? AND youtube_id != '' LIMIT ?`
+       FROM songs WHERE film_id = ? AND title IS NOT NULL AND title != ''
+       ORDER BY (youtube_id IS NOT NULL AND youtube_id != '') DESC, id ASC
+       LIMIT ?`
     )
     .all(filmId, limit) as Song[];
 }

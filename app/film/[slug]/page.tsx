@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getFilmBySlug, getReviewsForFilm, getSongsForFilm, getCastForFilm, getSimilarFilms } from "@/lib/db";
 import BadgeChip from "@/components/BadgeChip";
 import ConsensusBar from "@/components/ConsensusBar";
-import VideoPlayer from "@/components/VideoPlayer";
+import SongsPlayer from "@/components/SongsPlayer";
 import DishooomMeter from "@/components/DishooomMeter";
 import Link from "next/link";
 
@@ -112,9 +112,6 @@ export default async function FilmPage({ params }: FilmPageProps) {
     const lastSpace = cut.lastIndexOf(" ");
     return (lastSpace > 60 ? cut.slice(0, lastSpace) : cut).trim() + "…";
   })();
-
-  const playableSongs = songs.filter((s) => s.youtubeId);
-  const listOnlySongs = songs.filter((s) => !s.youtubeId);
 
   return (
     <div style={{ background: "#0d0505" }}>
@@ -255,29 +252,8 @@ export default async function FilmPage({ params }: FilmPageProps) {
       {songs.length > 0 && (
         <section style={{ borderTop: DIVIDER }}>
           <div style={SECTION_PAD}>
-            <SectionHeading count={songs.length}>Soundtrack</SectionHeading>
-
-            {playableSongs.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                {playableSongs.map((song) => (
-                  <VideoPlayer key={song.id} youtubeId={song.youtubeId!} title={song.title || "Untitled"} />
-                ))}
-              </div>
-            )}
-
-            {listOnlySongs.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {listOnlySongs.map((song) => (
-                  <span
-                    key={song.id}
-                    className="text-sm px-3 py-1 rounded-full"
-                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}
-                  >
-                    {song.title || "Untitled"}
-                  </span>
-                ))}
-              </div>
-            )}
+            <SectionHeading count={songs.length}>Songs</SectionHeading>
+            <SongsPlayer songs={songs} />
           </div>
         </section>
       )}
