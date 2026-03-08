@@ -50,11 +50,11 @@ export default function VibeGrid({ stats }: VibeGridProps) {
               className="relative overflow-hidden rounded group"
               style={{ minHeight: 100 }}
             >
-              {/* Poster bg */}
-              {stat.posterSrc ? (
+              {/* Backdrop bg */}
+              {stat.backdropSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={stat.posterSrc}
+                  src={stat.backdropSrc}
                   alt=""
                   aria-hidden
                   className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity"

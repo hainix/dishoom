@@ -2,15 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import type { ReactNode } from 'react';
 import {
-  getSpotlightArticles,
   getLatestArticles,
   getFilmsByStatus,
   getVibeStats,
   getFilmsByDecade,
   getFeaturedSongs,
 } from "@/lib/db";
-import ArticlePost from "@/components/ArticlePost";
-import SpotlightGrid from "@/components/SpotlightGrid";
 import VibeGrid from "@/components/VibeGrid";
 import DecadeRail from "@/components/DecadeRail";
 import VideoPlayer from "@/components/VideoPlayer";
@@ -122,10 +119,10 @@ function RailSection({ label, href, children }: { label: string; href?: string; 
 }
 
 const CATEGORY_PILLS = [
-  { label: '🕺 Dance', value: 'dance' },
-  { label: '💘 Love Songs', value: 'love' },
-  { label: '🕌 Qawwali', value: 'qawwali' },
-  { label: '🔥 Item Numbers', value: 'item' },
+  { label: '🎞️ Golden Age', value: 'golden-age' },
+  { label: '🫀 Soulful', value: 'soulful' },
+  { label: '🎧 Earworm', value: 'earworm' },
+  { label: '🙏 Devotional', value: 'devotional' },
 ] as const;
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -143,7 +140,6 @@ export default function HomePage() {
   const films2000s = getFilmsByDecade(2000, 12);
   const films1990s = getFilmsByDecade(1990, 12);
   const films1980s = getFilmsByDecade(1980, 12);
-  const spotlightArticles = getSpotlightArticles(1, 12);
 
   return (
     <div>
@@ -261,9 +257,10 @@ export default function HomePage() {
                 </div>
                 <div className="flex gap-2 mt-4 flex-wrap">
                   {CATEGORY_PILLS.map(({ label, value }) => (
-                    <Link key={value} href={`/watch?category=${value}`}
-                          className="text-xs px-3 py-1.5 rounded-full font-semibold hover:opacity-80 transition-opacity"
-                          style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                    <Link key={value} href={`/watch?category=${value}&page=1`}
+                          className="text-xs font-bold rounded-full transition-all hover:scale-105 hover:shadow-md"
+                          style={{ padding: '7px 16px', background: 'rgba(212,175,55,0.1)', color: '#D4AF37',
+                                   border: '1px solid rgba(212,175,55,0.45)', letterSpacing: '0.03em' }}>
                       {label}
                     </Link>
                   ))}
@@ -329,35 +326,45 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── 5. Spotlight + Latest News ──────────────────────────────────────── */}
+      {/* ── 5. Latest News ──────────────────────────────────────────────────── */}
       <div style={{ borderTop: "1px solid rgba(212,175,55,0.2)" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto" }} className="flex flex-col md:flex-row">
-          <div className="p-4 md:w-1/2">
-            <h2 className="text-xl font-bold mb-3 pb-2 uppercase tracking-wide"
-                style={{ fontFamily: "var(--font-display)", color: "white", borderBottom: "1px solid rgba(212,175,55,0.3)" }}>
-              Spotlight
-            </h2>
-            <SpotlightGrid articles={spotlightArticles} />
-          </div>
-          <div className="p-4 md:w-1/2 border-t md:border-t-0"
-               style={{ borderLeft: "1px solid rgba(255,255,255,0.08)" }}>
-            <h2 className="text-xl font-bold mb-3 pb-2 uppercase tracking-wide"
-                style={{ fontFamily: "var(--font-display)", color: "white", borderBottom: "1px solid rgba(212,175,55,0.3)" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 1rem" }}>
+          <div className="flex items-center gap-3 mb-6 pb-2"
+               style={{ borderBottom: "1px solid rgba(212,175,55,0.25)" }}>
+            <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: "#D4AF37" }}>
               Latest News
             </h2>
-            <div className="std-posts">
-              {latestArticles.map((article) => (
-                <ArticlePost key={article.id} article={article} />
-              ))}
-              {latestArticles.length === 0 && (
-                <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>No articles yet.</p>
-              )}
-            </div>
-            <div className="mt-4">
-              <Link href="/news" className="text-dishoom-red text-sm font-medium hover:underline">
-                View all news →
+            <Link href="/news" className="ml-auto text-xs hover:underline"
+                  style={{ color: "rgba(255,255,255,0.4)" }}>
+              View all →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+            {latestArticles.map((article) => (
+              <Link key={article.id} href={`/news/${article.slug}`} className="block group flex gap-4 items-start">
+                {article.thumbnail && (
+                  <div className="flex-shrink-0 overflow-hidden rounded" style={{ width: 88, height: 60 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={article.thumbnail}
+                      alt=""
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <h3 className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-yellow-300 transition-colors"
+                      style={{ fontFamily: "var(--font-display)", color: "rgba(255,255,255,0.9)" }}>
+                    {article.title}
+                  </h3>
+                  {article.description && (
+                    <p className="text-xs mt-1 line-clamp-1" style={{ color: "rgba(255,255,255,0.45)" }}>
+                      {article.description}
+                    </p>
+                  )}
+                </div>
               </Link>
-            </div>
+            ))}
           </div>
         </div>
       </div>

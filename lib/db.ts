@@ -48,7 +48,7 @@ export interface Film {
 export interface VibeStat {
   badge: string;
   count: number;
-  posterSrc: string | null;
+  backdropSrc: string | null;
 }
 
 export interface Review {
@@ -471,27 +471,30 @@ export function getFilmsByDecade(decade: number, limit = 12): Film[] {
 }
 
 export function getVibeStats(): VibeStat[] {
+  // Order by rating DESC so the first film seen per badge is the best-rated one,
+  // ensuring each vibe tile gets a distinct high-quality backdrop image.
   const rows = getDb()
     .prepare(
-      `SELECT badges, poster_src as posterSrc FROM films
-       WHERE badges IS NOT NULL AND badges != ''`
+      `SELECT badges, backdrop_src as backdropSrc FROM films
+       WHERE badges IS NOT NULL AND badges != ''
+       ORDER BY rating DESC NULLS LAST`
     )
-    .all() as { badges: string; posterSrc: string | null }[];
+    .all() as { badges: string; backdropSrc: string | null }[];
 
   const counts: Record<string, number> = {};
-  const posters: Record<string, string | null> = {};
+  const backdrops: Record<string, string | null> = {};
 
   for (const row of rows) {
     const tags = row.badges.split(",").map((t) => t.trim()).filter(Boolean);
     for (const tag of tags) {
       counts[tag] = (counts[tag] || 0) + 1;
-      if (!posters[tag] && row.posterSrc) {
-        posters[tag] = row.posterSrc;
+      if (!backdrops[tag] && row.backdropSrc) {
+        backdrops[tag] = row.backdropSrc;
       }
     }
   }
 
   return Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
-    .map(([badge, count]) => ({ badge, count, posterSrc: posters[badge] ?? null }));
+    .map(([badge, count]) => ({ badge, count, backdropSrc: backdrops[badge] ?? null }));
 }
