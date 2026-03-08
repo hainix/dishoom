@@ -72,13 +72,40 @@ console.log(`Searching YouTube for ${songs.length} songs (limit ${LIMIT})…\n`)
 
 const updateStmt = db.prepare("UPDATE songs SET youtube_id = ? WHERE id = ?");
 
+/** Check which video IDs allow embedding (batch up to 50, costs 1 unit). Falls back to oEmbed on quota. */
+async function checkEmbeddable(ids: string[]): Promise<Set<string>> {
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=status&id=${ids.join(",")}&key=${API_KEY}`;
+  const res = await fetch(url);
+  if (res.ok) {
+    const data = await res.json() as {
+      items?: { id: string; status: { embeddable: boolean; privacyStatus: string } }[]
+    };
+    return new Set(
+      (data.items ?? [])
+        .filter(i => i.status?.embeddable && i.status?.privacyStatus === "public")
+        .map(i => i.id)
+    );
+  }
+  // Quota or auth error — fall back to oEmbed (no quota)
+  const embeddable = new Set<string>();
+  for (const id of ids) {
+    try {
+      // Must use GET — HEAD returns 200 even for embedding-disabled videos
+      const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+      if (r.ok) embeddable.add(id);
+    } catch { embeddable.add(id); } // network error: assume fine
+    await new Promise(r => setTimeout(r, 80));
+  }
+  return embeddable;
+}
+
 async function searchYouTube(query: string): Promise<string | null> {
   const url = new URL("https://www.googleapis.com/youtube/v3/search");
   url.searchParams.set("part", "snippet");
   url.searchParams.set("q", query);
   url.searchParams.set("type", "video");
   url.searchParams.set("videoCategoryId", "10"); // Music category
-  url.searchParams.set("maxResults", "5");
+  url.searchParams.set("maxResults", "8"); // fetch more so we have fallbacks
   url.searchParams.set("key", API_KEY!);
 
   const res = await fetch(url.toString());
@@ -94,9 +121,16 @@ async function searchYouTube(query: string): Promise<string | null> {
 
   if (!data.items?.length) return null;
 
-  // Prefer official channel results
-  const preferred = data.items.find(item => PREFERRED_CHANNELS.has(item.snippet.channelId));
-  return (preferred ?? data.items[0]).id.videoId;
+  // Filter to only embeddable results before picking
+  const ids = data.items.map(i => i.id.videoId);
+  const embeddable = await checkEmbeddable(ids);
+  if (!embeddable.size) return null;
+
+  const preferred = data.items.find(
+    i => PREFERRED_CHANNELS.has(i.snippet.channelId) && embeddable.has(i.id.videoId)
+  );
+  const any = data.items.find(i => embeddable.has(i.id.videoId));
+  return (preferred ?? any)?.id.videoId ?? null;
 }
 
 async function main() {
