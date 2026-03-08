@@ -344,6 +344,7 @@ export function getLatestArticles(page = 1, limit = 15): Article[] {
     .prepare(
       `SELECT ${ARTICLE_SELECT} FROM articles a
        LEFT JOIN films f ON a.film_id = f.id
+       WHERE a.thumbnail IS NOT NULL AND a.thumbnail != ''
        ORDER BY a.id DESC LIMIT ? OFFSET ?`
     )
     .all(limit, offset) as Article[];

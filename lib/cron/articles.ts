@@ -344,7 +344,12 @@ Return JSON only, no markdown fences:
   try { parsed = JSON.parse(jsonMatch[0]); } catch { return null; }
 
   const content = buildHtml(parsed.paragraphs ?? [], backdrops);
-  const thumbnail = movie.poster_path ? `${POSTER_BASE}${movie.poster_path}` : null;
+  // Prefer poster; fall back to backdrop for thumbnail so we always have an image
+  const thumbnail = movie.poster_path
+    ? `${POSTER_BASE}${movie.poster_path}`
+    : movie.backdrop_path
+    ? `${BACKDROP_BASE}${movie.backdrop_path}`
+    : (backdrops[0]?.src ?? null);
 
   return {
     title: parsed.title,
@@ -398,7 +403,15 @@ Return JSON only, no markdown fences:
   try { parsed = JSON.parse(jsonMatch[0]); } catch { return null; }
 
   const content = buildHtml(parsed.paragraphs ?? [], images);
-  const thumbnail = images[0]?.src ?? null;
+  // Fall back to DB person photo if TMDB images unavailable
+  let thumbnail = images[0]?.src ?? null;
+  if (!thumbnail) {
+    const db = getDb();
+    const dbPerson = db.prepare(
+      `SELECT image_url FROM people WHERE name = ? AND image_url IS NOT NULL LIMIT 1`
+    ).get(starName) as { image_url: string } | undefined;
+    if (dbPerson?.image_url) thumbnail = dbPerson.image_url;
+  }
 
   return {
     title: parsed.title,
@@ -588,6 +601,10 @@ export async function runArticlesCron(): Promise<void> {
   let inserted = 0;
 
   function tryInsert(art: { title: string; slug: string; description: string; content: string; thumbnail: string | null; celebrity?: string | null }) {
+    if (!art.thumbnail) {
+      console.warn(`[cron:articles] skipping "${art.title}" — no thumbnail`);
+      return;
+    }
     const result = insertArticle.run({
       title: art.title,
       slug: art.slug,

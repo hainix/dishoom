@@ -1,7 +1,6 @@
 #!/bin/bash
-# Daily cron script — fetches YouTube IDs for trailers + songs.
-# Budget: 10,000 units/day free = 100 searches total.
-# Split: 60 trailers (popular films first) + 40 songs (top-rated films first).
+# Daily cron — runs the full pipeline: articles, films status, songs (embed audit + backfill).
+# Scheduled via crontab: 0 2 * * *
 # Logs to: scripts/run-daily.log
 
 set -euo pipefail
@@ -11,14 +10,13 @@ LOG="$DIR/scripts/run-daily.log"
 NPX="$DIR/node_modules/.bin/tsx"
 
 echo "──────────────────────────────────────────" >> "$LOG"
-echo "$(date '+%Y-%m-%d %H:%M:%S') — Daily fetch starting" >> "$LOG"
+echo "$(date '+%Y-%m-%d %H:%M:%S') — Daily cron starting" >> "$LOG"
 
-# Trailers first (60 searches — popular films need this most)
-echo "$(date '+%H:%M:%S') Fetching trailers (60)…" >> "$LOG"
-"$NPX" "$DIR/scripts/fetch-trailers.ts" --limit=60 >> "$LOG" 2>&1
+"$NPX" "$DIR/scripts/run-daily.ts" >> "$LOG" 2>&1
+STATUS=$?
 
-# Songs second (40 searches — fills Watch page over time)
-echo "$(date '+%H:%M:%S') Fetching song IDs (40)…" >> "$LOG"
-"$NPX" "$DIR/scripts/fetch-youtube-ids.ts" --limit=40 >> "$LOG" 2>&1
-
-echo "$(date '+%H:%M:%S') — Done." >> "$LOG"
+if [ $STATUS -eq 0 ]; then
+  echo "$(date '+%H:%M:%S') — Done (exit 0)" >> "$LOG"
+else
+  echo "$(date '+%H:%M:%S') — FAILED (exit $STATUS)" >> "$LOG"
+fi
