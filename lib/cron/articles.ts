@@ -283,6 +283,19 @@ const DISHOOM_VOICE = `You write for Dishoom Films — a Bollywood review and go
 - Dry wit is welcome. Reverence is not.
 - Reads like a smart tabloid, not a film studies essay.`;
 
+/**
+ * Shared system block for all Claude article generators.
+ * cache_control marks this prefix as cacheable — once prompts grow beyond the
+ * model's minimum token threshold (4,096 for Haiku 4.5), cache hits will apply.
+ */
+const VOICE_SYSTEM = [
+  {
+    type: "text" as const,
+    text: DISHOOM_VOICE,
+    cache_control: { type: "ephemeral" as const },
+  },
+];
+
 // ── Article generators ────────────────────────────────────────────────────────
 
 async function generateFilmNewsArticle(
@@ -305,9 +318,7 @@ async function generateFilmNewsArticle(
     backdrops.push({ src: `${BACKDROP_BASE}${movie.backdrop_path}`, caption: movie.title });
   }
 
-  const prompt = `${DISHOOM_VOICE}
-
-Write a 5-paragraph article about "${movie.title}" (${movie.release_date?.slice(0, 4) ?? "recent"}).
+  const prompt = `Write a 5-paragraph article about "${movie.title}" (${movie.release_date?.slice(0, 4) ?? "recent"}).
 
 Film details:
 - Overview: ${movie.overview || "A new Bollywood release"}
@@ -332,6 +343,7 @@ Return JSON only, no markdown fences:
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1000,
+    system: VOICE_SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -370,9 +382,7 @@ async function generateStarSpotlight(
   const personImages = personId ? await fetchPersonImages(personId) : [];
   const images = personImages.map((src) => ({ src, caption: starName }));
 
-  const prompt = `${DISHOOM_VOICE}
-
-Write a 5-paragraph profile of Bollywood star "${starName}".
+  const prompt = `Write a 5-paragraph profile of Bollywood star "${starName}".
 
 Write exactly 5 paragraphs (no headings), 3-4 sentences each. Be specific — name actual films, songs, moments. Don't just say "iconic", show why. Cover:
 P1: Who are they, really? Lead with the most interesting thing about them.
@@ -391,6 +401,7 @@ Return JSON only, no markdown fences:
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1000,
+    system: VOICE_SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -437,9 +448,7 @@ async function generateListicle(
      ORDER BY rating DESC LIMIT 15`
   ).all() as PosterRow[];
 
-  const prompt = `${DISHOOM_VOICE}
-
-Write a listicle about: "${topic}"
+  const prompt = `Write a listicle about: "${topic}"
 
 Write a sharp intro paragraph (3-4 sentences — make an argument, don't just describe what the list is), then exactly 10 numbered items.
 Each item: <strong>[Film or Name]</strong> — 2-3 sentences. Be specific about why it's on the list. Have opinions.
@@ -457,6 +466,7 @@ Return JSON only, no markdown fences:
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1400,
+    system: VOICE_SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -531,9 +541,7 @@ async function generateClassicRetro(
     images.push(...extra);
   }
 
-  const prompt = `${DISHOOM_VOICE}
-
-Write a 5-paragraph retrospective about the classic Bollywood film "${film.title}" (${film.year ?? "classic era"}).
+  const prompt = `Write a 5-paragraph retrospective about the classic Bollywood film "${film.title}" (${film.year ?? "classic era"}).
 
 Film details:
 - Plot: ${film.plot ?? "A landmark of Indian cinema"}
@@ -557,6 +565,7 @@ Return JSON only, no markdown fences:
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1000,
+    system: VOICE_SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
 

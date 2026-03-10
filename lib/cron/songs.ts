@@ -138,34 +138,60 @@ async function searchYouTube(query: string): Promise<string | null> {
 
 // ── Song tagging ─────────────────────────────────────────────────────────────
 
-async function autoTagSong(
+/**
+ * Tag a batch of songs in a single Claude call.
+ * Returns a map of song id → comma-separated tag string.
+ * cache_control on the system message means the static TAG_VOCABULARY prefix
+ * will be cached once it reaches the model's minimum token threshold.
+ */
+async function autoTagSongsBatch(
   client: Anthropic,
-  songTitle: string,
-  filmTitle: string,
-  filmYear: number | null
-): Promise<string> {
-  const prompt = `You are a Bollywood music expert. Choose 3-5 tags for this song from the vocabulary below.
+  songs: Array<{ id: number; title: string; filmTitle: string; filmYear: number | null }>
+): Promise<Map<number, string>> {
+  if (songs.length === 0) return new Map();
 
-Song: "${songTitle}"
-Film: "${filmTitle}" (${filmYear ?? "recent"})
-
-Tag vocabulary:
-${TAG_VOCABULARY.join(", ")}
-
-Respond with only a comma-separated list of tags, nothing else. Example: romantic,earworm,ar-rahman`;
+  const list = songs
+    .map((s) => `id=${s.id} | "${s.title}" from "${s.filmTitle}" (${s.filmYear ?? "recent"})`)
+    .join("\n");
 
   const message = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 80,
-    messages: [{ role: "user", content: prompt }],
+    max_tokens: songs.length * 30 + 50,
+    system: [
+      {
+        type: "text" as const,
+        text: `You are a Bollywood music expert. Tag each song with 3-5 tags from this vocabulary:\n${TAG_VOCABULARY.join(", ")}`,
+        cache_control: { type: "ephemeral" as const },
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: `Tag all ${songs.length} songs below. Respond with JSON only, no markdown: {"<id>":"tag1,tag2,...", ...}\n\n${list}`,
+      },
+    ],
   });
 
   const text = message.content[0].type === "text" ? message.content[0].text.trim() : "";
-  const valid = text
-    .split(",")
-    .map(t => t.trim().toLowerCase())
-    .filter(t => TAG_VOCABULARY.includes(t));
-  return valid.slice(0, 5).join(",");
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return new Map();
+
+  const result = new Map<number, string>();
+  try {
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, string>;
+    for (const [key, val] of Object.entries(parsed)) {
+      const id = parseInt(key);
+      if (!isNaN(id) && typeof val === "string") {
+        const valid = val
+          .split(",")
+          .map((t) => t.trim().toLowerCase())
+          .filter((t) => TAG_VOCABULARY.includes(t));
+        if (valid.length > 0) result.set(id, valid.slice(0, 5).join(","));
+      }
+    }
+  } catch { /* ignore parse errors */ }
+
+  return result;
 }
 
 // ── Embed audit ──────────────────────────────────────────────────────────────
@@ -288,27 +314,26 @@ export async function runSongsCron(): Promise<void> {
 
   console.log(`[cron:songs] processing ${newSongs.length} new-film songs + ${backfillSongs.length} backfill songs`);
 
+  // Step A: YouTube searches — sequential, rate-limited
   for (const song of allToProcess) {
     if (!song.title) continue;
-
     const videoId = await searchYouTube(`${song.title} ${song.filmTitle} official`);
     if (videoId) {
       updateYoutubeId.run(videoId, song.id);
       ytFound++;
     }
     await new Promise(r => setTimeout(r, 200));
+  }
 
-    try {
-      const tags = await autoTagSong(client, song.title, song.filmTitle, song.filmYear);
-      if (tags) {
-        updateCategory.run(tags, song.id);
-        tagged++;
-      }
-    } catch (err) {
-      console.error(`[cron:songs] tagging failed for "${song.title}":`, err);
+  // Step B: Tag all songs in a single batched Claude call
+  try {
+    const tagMap = await autoTagSongsBatch(client, allToProcess.filter(s => !!s.title));
+    for (const [id, tags] of tagMap) {
+      updateCategory.run(tags, id);
+      tagged++;
     }
-
-    await new Promise(r => setTimeout(r, 300));
+  } catch (err) {
+    console.error("[cron:songs] batch tagging failed:", err);
   }
 
   console.log(`[cron:songs] ${ytFound} YouTube IDs found, ${tagged} songs tagged`);
